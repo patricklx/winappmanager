@@ -1,0 +1,16 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/CheckNew.ico</file>
+        <file>icons/Download.ico</file>
+        <file>icons/hasupdate.ico</file>
+        <file>icons/information.ico</file>
+        <file>icons/IsDL.ico</file>
+        <file>icons/IsInstalled.ico</file>
+        <file>icons/isnew.ico</file>
+        <file>icons/Remove.ico</file>
+        <file>icons/search.ico</file>
+        <file>icons/Start_Task1.ico</file>
+        <file>icons/Upgrade.ico</file>
+        <file>icons/WinApp_Manager.ico</file>
+    </qresource>
+</RCC>
