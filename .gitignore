@@ -5,3 +5,5 @@
 /Makefile
 /Makefile.Debug
 /Makefile.Release
+/release32/
+/release64/

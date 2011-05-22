@@ -26,11 +26,13 @@ UpdaterDialog::UpdaterDialog(QList<applist_t::fileinfo_t> &list,enum download_ty
     if(m_type == update_version)
     {
         m_count = m_max = list.count();
+        qDebug(tr("updating version: %1").arg(m_count).toAscii().data());
         ui->progressBar->setMaximum(m_max);
         ui->label->setText(tr("updating versions %1/%2").arg(m_max-m_count).arg(m_max));
         connect(&qnam, SIGNAL(finished(QNetworkReply*)),SLOT(ondownloadFinished(QNetworkReply*)));
         for(int i=0;i<list.count();i++)
         {
+            qDebug("%d",i);
             list[i].info->updateVersion(&qnam);
         }
     }else
@@ -56,8 +58,6 @@ UpdaterDialog::UpdaterDialog(QList<applist_t::fileinfo_t> &list,enum download_ty
         reply = qnam.get(QNetworkRequest(url));
         connect(reply,SIGNAL(downloadProgress(qint64,qint64)),SLOT(onProgress(qint64,qint64)));
         connect(reply,SIGNAL(finished()),SLOT(onAppListDownloaded()));
-
-
     }
 }
 
@@ -200,6 +200,7 @@ void UpdaterDialog::onNewFileInfo()
 void UpdaterDialog::ondownloadFinished(QNetworkReply *reply)
 {
     m_count--;
+    reply->deleteLater();
     ui->progressBar->setValue(m_max-m_count);
     if(m_type == update_version)
         ui->label->setText(tr("updating versions %1/%2").arg(m_max-m_count).arg(m_max));

@@ -37,6 +37,7 @@ public:
 signals:
     void taskChosen(task_t *task);
     void unSelected(appinfo_t *info);
+    void versions_available();
 
 private slots:
     void on_TCategoryTree_itemSelectionChanged();
@@ -52,6 +53,7 @@ private slots:
     void onSetAppInfoUpdated(QString name, QString lastUpdate);
 
     void on_lbSearch_textChanged(const QString &arg1);
+    bool loadList();
 
 public slots:
     void onRemovedFromTasks(appinfo_t *info);
@@ -66,7 +68,7 @@ private:
     void appendToList(fileinfo_t &fileinfo);
     void saveList();
     void loadCategoryTree(QDomElement node,QTreeWidgetItem *item);
-    bool loadList();
+
     void clear();
 
 };

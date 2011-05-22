@@ -23,7 +23,6 @@ SOURCES += main.cpp\
     applist_t.cpp
 
 HEADERS  += mainwindow.h \
-    searchbox.h \
     appinfo_t.h \
     settingsdialog.h \
     choosedialog.h \

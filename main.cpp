@@ -13,9 +13,9 @@ Q_IMPORT_PLUGIN(qico)
 int main(int argc, char *argv[])
 {
     QDir::setCurrent(QString(argv[0]).beforeLast('\\'));
-    SettingsDialog::loadSettings();
     QApplication a(argc, argv);
     a.setQuitOnLastWindowClosed(false);
+    SettingsDialog::loadSettings();
 
     MainWindow w;
     if(!(argc>0 && QString(argv[1])==QString("hidden")))
@@ -23,7 +23,6 @@ int main(int argc, char *argv[])
         w.show();
     }
 
-
-
     return a.exec();
+    SettingsDialog::unLoadSettings();
 }

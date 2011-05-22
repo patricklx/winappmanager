@@ -2,6 +2,7 @@
 #include <QDate>
 #include <QMessageBox>
 #include <QDir>
+#include <QNetworkProxy>
 #include "settingsdialog.h"
 #include "ui_settingsdialog.h"
 
@@ -66,6 +67,30 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
         ui->installModeSilent->setChecked(true);
         break;
     }
+
+    if(proxyEnabled())
+        ui->proxy_settings->setChecked(true);
+
+    switch(settings->value(tr("PROXY_TYPE")).toInt())
+    {
+    case QNetworkProxy::Socks5Proxy:
+        ui->proxy_type->setCurrentIndex(0);
+        break;
+    case QNetworkProxy::HttpProxy:
+        ui->proxy_type->setCurrentIndex(1);
+        break;
+    case QNetworkProxy::HttpCachingProxy:
+        ui->proxy_type->setCurrentIndex(2);
+        break;
+    case QNetworkProxy::FtpCachingProxy:
+        ui->proxy_type->setCurrentIndex(3);
+        break;
+    }
+
+    ui->proxy_hostname->setText( settings->value(tr("PROXY_HOSTNAME")).toString() );
+    ui->proxy_username->setText( settings->value(tr("PROXY_USERNAME")).toString() );
+    ui->proxy_port->setText( settings->value(tr("PROXY_PORT")).toString() );
+    ui->proxy_password->setText( settings->value(tr("PROXY_PASSWORD")).toString());
 }
 
 SettingsDialog::~SettingsDialog()
@@ -113,19 +138,79 @@ void SettingsDialog::on_btApply_clicked()
         settings->setValue(tr("INSTALL_TASK_MODE"),ATTENDED);
     if( ui->installModeSilent->isChecked() )
         settings->setValue(tr("INSTALL_TASK_MODE"),SILENT);
+
+    if( ui->proxy_settings->isChecked() )
+    {
+        settings->setValue(tr("PROXY_ENABLED"),true);
+        QString value;
+        value = ui->proxy_hostname->text();
+        settings->setValue(tr("PROXY_HOSTNAME"),value);
+
+        value = ui->proxy_password->text();
+        settings->setValue(tr("PROXY_PASSWORD"),value);
+
+        value = ui->proxy_port->text();
+        settings->setValue(tr("PROXY_PORT"),value);
+
+        value = ui->proxy_type->currentText();
+        if(value == tr("Socks5Proxy"))
+            settings->setValue(tr("PROXY_TYPE"),QNetworkProxy::Socks5Proxy);
+        if( value == tr("HttpProxy"))
+            settings->setValue(tr("PROXY_TYPE"),QNetworkProxy::HttpProxy);
+        if( value == tr("HttpCachingProxy") )
+            settings->setValue(tr("PROXY_TYPE"),QNetworkProxy::HttpCachingProxy);
+        if( value == tr("FtpCachingProxy") )
+            settings->setValue(tr("PROXY_TYPE"),QNetworkProxy::FtpCachingProxy);
+
+        value = ui->proxy_username->text();
+        settings->setValue(tr("PROXY_USERNAME"),value);
+        setNetworkProxy();
+    }else
+        settings->setValue(tr("PROXY_ENABLED"),false);
+    saveSettings();
     close();
+}
+
+bool SettingsDialog::proxyEnabled()
+{
+    return settings->value(tr("PROXY_ENABLED")).toBool();
+}
+
+QNetworkProxy SettingsDialog::getProxySettings()
+{
+    QNetworkProxy proxy;
+    proxy.setType((QNetworkProxy::ProxyType)settings->value(tr("PROXY_TYPE")).toInt());
+    proxy.setHostName(settings->value(tr("PROXY_HOSTNAME")).toString());
+    proxy.setUser(settings->value(tr("PROXY_USERNAME")).toString());
+    proxy.setPassword(settings->value(tr("PROXY_PASSWORD")).toString());
+    proxy.setPort(settings->value(tr("PROXY_PORT")).toInt());
+    return proxy;
+}
+
+void SettingsDialog::loadSettings()
+{
+    settings = new QSettings(QString("WinAppM_settings.ini"),QSettings::IniFormat);
+    setNetworkProxy();
+}
+
+void SettingsDialog::unLoadSettings()
+{
+    saveSettings();
+    delete settings;
+}
+
+void SettingsDialog::setNetworkProxy()
+{
+    if(proxyEnabled())
+    {
+        QNetworkProxy proxy = getProxySettings();
+        QNetworkProxy::setApplicationProxy(proxy);
+    }
 }
 
 void SettingsDialog::on_btCancel_clicked()
 {
     close();
-}
-
-
-void SettingsDialog::loadSettings()
-{
-    settings = new QSettings(QString("WinAppM_settings.ini"),QSettings::IniFormat);
-
 }
 
 void SettingsDialog::saveSettings()

@@ -7,6 +7,8 @@
 #include <windows.h>
 #include <Psapi.h>
 #include <tlhelp32.h>
+#include <settingsdialog.h>
+#include <QApplication>
 
 task_t::task_t(appinfo_t *appinfo,int flags):
     QThread(),
@@ -149,8 +151,8 @@ bool task_t::install()
     QStringList args;
     QString launchCommand = m_appinfo->Path + tr("/") + m_appinfo->fileName;
     m_current_task = INSTALL;
-    if( isSet(SILENT) )
-        args << tr("/c") << tr("start") << tr("""") << tr("/wait") << launchCommand << m_appinfo->install_param;
+    if( isSet(SILENT) && m_appinfo->install_param!="ALWAYS")
+        args << tr("/c") << tr("start") << tr("""") << tr("/wait") << launchCommand << m_appinfo->install_param.split(" ",QString::SkipEmptyParts);
     else
         args << tr("/c") << tr("start") << tr("""") << tr("/wait") << launchCommand;
 
@@ -158,7 +160,18 @@ bool task_t::install()
     qDebug(m_appinfo->install_param.toAscii());
     emit progress(this,-1,tr("installing..."));
 
-    proc.start(tr("cmd"),args);
+    if(m_appinfo->Name == tr("WinApp_Manager"))
+        proc.startDetached(launchCommand+tr(" ")+m_appinfo->install_param);
+    else
+        proc.start(tr("cmd"),args);
+
+    if(m_appinfo->Name == tr("WinApp_Manager"))
+    {
+        QApplication::quit();
+        emit progress(this,50,tr("updating WinApp_Manager"));
+        return true;
+    }
+
     if( !proc.waitForFinished(-1) )
     {
         emit progress(this,0,proc.errorString());
@@ -172,14 +185,12 @@ bool task_t::install()
 
     if( m_appinfo->ParseRegistryInfo() )
     {
-        m_appinfo->InstalledVersion = m_appinfo->registry_info.version;
         m_appinfo->setFlag( appinfo_t::INSTALLED );
         m_appinfo->saveApplicationInfo();
-        qDebug(m_appinfo->InstalledVersion.toAscii());
 
         if(m_appinfo->newerVersionAvailable())
         {
-            emit progress(this,0,tr("install failed, wrong version"));
+            emit progress(this,0,tr("install failed, wrong version - if the latest version is installed, right click and select:'force tolatest'"));
             return false;
         }
 
@@ -227,7 +238,22 @@ bool task_t::download()
         return false;
     }
 
-    QString launchCommand =  tr("aria2c.exe --dir=\"") + path + tr("\" --seed-time=0  --human-readable --bt-stop-timeout=2   --allow-overwrite=true --auto-save-interval=10 --summary-interval=0 ") + tr("\"") + url + tr("\"");
+    QString launchCommand =  tr("aria2c.exe --dir=\"") + path + tr("\" --seed-time=0  --human-readable --bt-stop-timeout=2   --allow-overwrite=true --auto-save-interval=10 --summary-interval=0 ");
+    if(SettingsDialog::proxyEnabled())
+    {
+        QNetworkProxy proxy = SettingsDialog::getProxySettings();
+        //[http://][USER:PASSWORD@]HOST[:PORT]
+        QString proxy_settings;
+
+        if(proxy.user().isEmpty())
+        {
+            proxy_settings = tr("http://%1:%2").arg(proxy.hostName()).arg(proxy.port());
+        }else
+            proxy_settings = tr("http://%1:%2@%3:%4 ").arg(proxy.user()).arg(proxy.password()).arg(proxy.hostName()).arg(proxy.port());
+        launchCommand += proxy_settings;
+    }
+    launchCommand += tr("\"") + url + tr("\" ");
+
     proc.start(launchCommand);
     if( proc.error()==QProcess::FailedToStart || !proc.waitForStarted() )
     {
@@ -259,11 +285,19 @@ bool task_t::download()
                     info = info.beforeFirst('.');
                     if (info.indexOf(tr("OK"))!=-1)
                     {
+
                         filename = fullinfo.afterLast('|');
                         filename = filename.beforeFirst('\n');
                         filename = filename.afterLast('/');
                         filename = filename.trimmed();
 
+                        //delete old file
+                        if( !m_appinfo->fileName.isEmpty() && m_appinfo->fileName != filename )
+                        {
+                            QFile file(path+tr("/")+m_appinfo->fileName);
+                            if(file.exists())
+                                file.remove();
+                        }
 
                         emit progress(this,100,tr("Downloaded: ")+filename);
 

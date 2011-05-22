@@ -42,7 +42,6 @@ public:
     QString Name;
     QString LatestVersion,
             DlVersion,
-            InstalledVersion,
             LastVersionCheck,
             Path,
             Description,
@@ -71,6 +70,7 @@ public:
     bool newerVersionAvailable();
 
     struct registry_info_t{
+        QString path;
         QString search_term;
         QString version_path;
         QString version;

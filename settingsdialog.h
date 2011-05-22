@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QDate>
+#include <QNetworkProxy>
 
 namespace Ui {
     class SettingsDialog;
@@ -27,6 +28,11 @@ public:
     bool setStartWithSystem(bool start_with_system);
     bool startsWithSystem();
 
+
+    static void setNetworkProxy();
+    static bool proxyEnabled();
+    static QNetworkProxy getProxySettings();
+
     static QDate lastVersionUpdate();
     static void setLastVersionUpdate(QDate date);
     static QDate lastInfoUpdate();
@@ -43,7 +49,10 @@ public:
     static int simulDownloadCount();
 
     static void saveSettings();
+
     static void loadSettings();
+    static void unLoadSettings();
+
 private slots:
     void on_btApply_clicked();
 

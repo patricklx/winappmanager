@@ -30,6 +30,7 @@ applist_t::applist_t(QWidget *parent) :
     ui(new Ui::applist_t)
 {
     ui->setupUi(this);
+    this->setEnabled(false);
     info_updates_avail = false;
     version_updates_avail = false;
     ui->LAppInfoList->sortItems(0,Qt::AscendingOrder);
@@ -39,38 +40,7 @@ applist_t::applist_t(QWidget *parent) :
     QTreeWidgetItem *item = new QTreeWidgetItem(QStringList(tr("All")));
     ui->TCategoryTree->addTopLevelItem(item);
 
-    loadList();
-
-    item = new QTreeWidgetItem(QStringList(tr("Updates")));
-    ui->TCategoryTree->addTopLevelItem(item);
-    item = new QTreeWidgetItem(QStringList(tr("Installed")));
-    ui->TCategoryTree->addTopLevelItem(item);
-    item = new QTreeWidgetItem(QStringList(tr("Downloaded")));
-    ui->TCategoryTree->addTopLevelItem(item);
-    item = new QTreeWidgetItem(QStringList(tr("New/Updated")));
-    ui->TCategoryTree->addTopLevelItem(item);
-    item = new QTreeWidgetItem(QStringList(tr("Only Installed")));
-    ui->TCategoryTree->addTopLevelItem(item);
-    item = new QTreeWidgetItem(QStringList(tr("Only Downloaded")));
-    ui->TCategoryTree->addTopLevelItem(item);
-    item = new QTreeWidgetItem(QStringList(tr("Only Info")));
-    ui->TCategoryTree->addTopLevelItem(item);
-
-    ui->TCategoryTree->setCurrentItem(ui->TCategoryTree->topLevelItem(0),0,QItemSelectionModel::Select);
-
-    if( (SettingsDialog::shouldCheckAppInfo() && SettingsDialog::lastInfoUpdate() < QDate::currentDate())
-            || fileinfo_list.isEmpty())
-    {
-        QTimer::singleShot(1000,this,SLOT(onCheckForNewAppInfo()));
-        SettingsDialog::setLastInfoUpdate(QDate::currentDate());
-    }
-
-    if(SettingsDialog::shouldCheckVersions() && SettingsDialog::lastVersionUpdate() < QDate::currentDate()
-            && !fileinfo_list.isEmpty())
-    {
-        QTimer::singleShot(1000,this,SLOT(on_btUpdate_clicked()));
-        SettingsDialog::setLastVersionUpdate(QDate::currentDate());
-    }
+    QTimer::singleShot(100,this,SLOT(loadList()));
 }
 
 applist_t::~applist_t()
@@ -193,9 +163,25 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
     if( action->text() == tr("ReInstall"))
     {
         task_t *task = new task_t(info,task_t::INSTALL);
+        if(!task->m_appinfo->install_param.isEmpty() && task->m_appinfo->install_param!=tr("ALWAYS"))
+        {
+            switch(SettingsDialog::getInstallMode())
+            {
+            case SettingsDialog::ASK:
+            {
+                int ans = QMessageBox::question(this,tr("Install Mode"),tr("%1 :Install in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
+                if(ans == QMessageBox::Yes)
+                    task->set(task_t::SILENT);
+                break;
+            }
+            case SettingsDialog::SILENT:
+                task->set(task_t::SILENT);
+            }
+        }
         emit taskChosen(task);
         info->setFlag(appinfo_t::SELECTED_INST_DL);
         item->setIcon(0,info->getIcon());
+
     }
 
     if( action->text() == tr("Execute installer"))
@@ -210,16 +196,19 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
     {
         if( !info->forceRegistryToLatestVersion() )
             QMessageBox::information(this,tr("setting registry value"),tr("failed to force latest version , try again as admin!"));
+        else
+            updateItem(info);
     }
     if( action->text() == tr("set ignore newer versions"))
     {
         info->setFlag(appinfo_t::IGNORE_LATEST);
-        info->LatestVersion = info->InstalledVersion.isEmpty()?info->DlVersion:info->InstalledVersion;
+        info->unSetFlag(appinfo_t::UPDATE_AVAIL);
+        info->LatestVersion.clear();
     }
     if( action->text() == tr("unset ignore newer versions"))
     {
         info->unSetFlag(appinfo_t::IGNORE_LATEST);
-        info->LatestVersion = info->InstalledVersion.isEmpty()?info->DlVersion:info->InstalledVersion;
+        info->updateVersion();
     }
 }
 
@@ -233,7 +222,7 @@ void applist_t::updateItem(appinfo_t *appinfo)
         return;
 
     item->setIcon(0,appinfo->getIcon());
-    item->setText(1,appinfo->DlVersion.isEmpty()?appinfo->InstalledVersion:appinfo->DlVersion);
+    item->setText(1,appinfo->DlVersion.isEmpty()?appinfo->registry_info.version:appinfo->DlVersion);
     item->setText(2,appinfo->LatestVersion);
     item->setText(4,appinfo->LastVersionCheck);
 }
@@ -297,17 +286,31 @@ void applist_t::loadCategoryTree(QDomElement node,QTreeWidgetItem *item)
 
 bool applist_t::loadList()
 {
-
     QFile appinfolist_file(tr("Info/PkgList.xml"));
 
     if( !appinfolist_file.open(QFile::ReadOnly) )
-        return false;
+    {
+        onCheckForNewAppInfo();
+        if( !appinfolist_file.open(QFile::ReadOnly) )
+        {
+            QMessageBox::information(NULL,"Error opening File","failed to open file \"Info/PkgList.xml\"");
+            return false;
+        }
+    }
+
 
     QDomDocument doc;
     if( !doc.setContent(&appinfolist_file) )
+    {
+        QMessageBox message;
+        message.setWindowTitle("Error loading Xml-File");
+        message.setText("<span>failed to load Info/PkgList.xml\n</span> delete the specified file or replace it with: <a href='http://appdriverupdate.sourceforge.net/Files/PkgList.xml'> PkgList.xml </a>");
+        message.exec();
         return false;
+    }
 
     QDomElement node = doc.documentElement();
+    ui->progressBar->setMaximum(node.childNodes().count());
 
     node = node.firstChildElement();
 
@@ -327,6 +330,7 @@ bool applist_t::loadList()
         if( !fileinfo.name.isEmpty() )
         {
             fileinfo.info = new appinfo_t(fileinfo.name);
+            QApplication::processEvents();
             if( fileinfo.info->loadFileInfo() )
             {
                 fileinfo_list.append(fileinfo);
@@ -336,8 +340,14 @@ bool applist_t::loadList()
                 delete fileinfo.info;
         }
         node = node.nextSiblingElement();
+        ui->progressBar->setValue(ui->progressBar->value()+1);
     }
     saveList();
+    this->setEnabled(true);
+
+    ui->progressBar->deleteLater();
+    ui->lbLoad->deleteLater();
+    ui->horizontalLayout->insertSpacerItem(3,new QSpacerItem(40, 10, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
     QFile categories_file(tr("Info/TreeInfo.xml"));
     if( !categories_file.open(QFile::ReadOnly) )
@@ -363,13 +373,44 @@ bool applist_t::loadList()
         ui->TCategoryTree->addTopLevelItem(child);
     }
 
+    QTreeWidgetItem *item;
+    item = new QTreeWidgetItem(QStringList(tr("Updates")));
+    ui->TCategoryTree->addTopLevelItem(item);
+    item = new QTreeWidgetItem(QStringList(tr("Installed")));
+    ui->TCategoryTree->addTopLevelItem(item);
+    item = new QTreeWidgetItem(QStringList(tr("Downloaded")));
+    ui->TCategoryTree->addTopLevelItem(item);
+    item = new QTreeWidgetItem(QStringList(tr("New/Updated")));
+    ui->TCategoryTree->addTopLevelItem(item);
+    item = new QTreeWidgetItem(QStringList(tr("Only Installed")));
+    ui->TCategoryTree->addTopLevelItem(item);
+    item = new QTreeWidgetItem(QStringList(tr("Only Downloaded")));
+    ui->TCategoryTree->addTopLevelItem(item);
+    item = new QTreeWidgetItem(QStringList(tr("Only Info")));
+    ui->TCategoryTree->addTopLevelItem(item);
+
+    ui->TCategoryTree->setCurrentItem(ui->TCategoryTree->topLevelItem(0),0,QItemSelectionModel::Select);
+
+    if( (SettingsDialog::shouldCheckAppInfo() && SettingsDialog::lastInfoUpdate() < QDate::currentDate())
+            || fileinfo_list.isEmpty())
+    {
+        QTimer::singleShot(500,this,SLOT(onCheckForNewAppInfo()));
+        SettingsDialog::setLastInfoUpdate(QDate::currentDate());
+    }
+    if( (SettingsDialog::shouldCheckVersions() && SettingsDialog::lastVersionUpdate() < QDate::currentDate())
+            && !fileinfo_list.isEmpty())
+    {
+        QTimer::singleShot(500,this,SLOT(on_btUpdate_clicked()));
+        SettingsDialog::setLastVersionUpdate(QDate::currentDate());
+    }
+
     return true;
 }
 
 void applist_t::appendToList(fileinfo_t &info)
 {
     QStringList columninfo;
-    columninfo << info.name << (info.info->InstalledVersion.isEmpty()?info.info->DlVersion:info.info->InstalledVersion) << info.info->LatestVersion << info.info->Description << info.info->LastVersionCheck;
+    columninfo << info.name << (info.info->registry_info.version.isEmpty()?info.info->DlVersion:info.info->registry_info.version) << info.info->LatestVersion << info.info->Description << info.info->LastVersionCheck;
     TreeWidgetItem *item = new TreeWidgetItem(columninfo);
     item->setToolTip(3,info.info->Description);
     item->setToolTip(0,info.info->Name);
@@ -475,11 +516,16 @@ void applist_t::on_LAppInfoList_itemActivated(QTreeWidgetItem *item, int column)
                 info->unSetFlag(appinfo_t::DOWNLOADED);
             }else
             {
-                if(info->isFlagSet(appinfo_t::INSTALLED))
-                    task = new task_t(info,inet_file,task_t::DOWNLOAD|task_t::INSTALL);
-                else
-                    task = new task_t(info,inet_file,task_t::DOWNLOAD);
-
+                if( info->LatestVersion == info->DlVersion )
+                {
+                    task = new task_t(info,inet_file,task_t::INSTALL);
+                }else
+                {
+                    if(info->isFlagSet(appinfo_t::INSTALLED))
+                        task = new task_t(info,inet_file,task_t::DOWNLOAD|task_t::INSTALL);
+                    else
+                        task = new task_t(info,inet_file,task_t::DOWNLOAD);
+                }
                 info->setFlag(appinfo_t::SELECTED_INST_DL);
                 goto chosen;
             }
@@ -497,9 +543,8 @@ void applist_t::on_LAppInfoList_itemActivated(QTreeWidgetItem *item, int column)
 
         if(info->isFlagSet(appinfo_t::INSTALLED))
         {
-            /*always try silent uninstall*/
             task = new task_t(info,task_t::UNINSTALL);
-            if( !info->uninstall_param.isEmpty() || !info->registry_info.silent_uninstall.isEmpty())
+            if( (!info->uninstall_param.isEmpty()&&info->uninstall_param!=tr("ALWAYS"))|| !info->registry_info.silent_uninstall.isEmpty())
             {
                 int ans = QMessageBox::question(this,tr("Uninstall Mode"),tr("%1 :UNinstall in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
                 if(ans == QMessageBox::Yes)
@@ -544,32 +589,38 @@ void applist_t::on_LAppInfoList_itemActivated(QTreeWidgetItem *item, int column)
         {
             if(task->isSet(task_t::INSTALL) && !info->isFlagSet(appinfo_t::UPDATE_AVAIL))
             {
-                switch(SettingsDialog::getInstallMode())
+                if(!task->m_appinfo->install_param.isEmpty() && task->m_appinfo->install_param!=tr("ALWAYS"))
                 {
-                case SettingsDialog::ASK:
-                {
-                    int ans = QMessageBox::question(this,tr("Install Mode"),tr("%1 :Install in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
-                    if(ans == QMessageBox::Yes)
+                    switch(SettingsDialog::getInstallMode())
+                    {
+                    case SettingsDialog::ASK:
+                    {
+                        int ans = QMessageBox::question(this,tr("Install Mode"),tr("%1 :Install in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
+                        if(ans == QMessageBox::Yes)
+                            task->set(task_t::SILENT);
+                        break;
+                    }
+                    case SettingsDialog::SILENT:
                         task->set(task_t::SILENT);
-                    break;
-                }
-                case SettingsDialog::SILENT:
-                    task->set(task_t::SILENT);
+                    }
                 }
             }
             if(task->isSet(task_t::INSTALL) && info->isFlagSet(appinfo_t::UPDATE_AVAIL))
             {
-                switch(SettingsDialog::getUpgradeMode())
+                if(!task->m_appinfo->install_param.isEmpty() && task->m_appinfo->install_param!=tr("ALWAYS"))
                 {
-                case SettingsDialog::ASK:
-                {
-                    int ans = QMessageBox::question(this,tr("Upgrade Mode"),tr("%1 :Upgrade in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
-                    if(ans == QMessageBox::Yes)
+                    switch(SettingsDialog::getUpgradeMode())
+                    {
+                    case SettingsDialog::ASK:
+                    {
+                        int ans = QMessageBox::question(this,tr("Upgrade Mode"),tr("%1 :Upgrade in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
+                        if(ans == QMessageBox::Yes)
+                            task->set(task_t::SILENT);
+                        break;
+                    }
+                    case SettingsDialog::SILENT:
                         task->set(task_t::SILENT);
-                    break;
-                }
-                case SettingsDialog::SILENT:
-                    task->set(task_t::SILENT);
+                    }
                 }
             }
             emit taskChosen(task);
@@ -658,20 +709,30 @@ void applist_t::onRemovedFromTasks(appinfo_t *info)
 
 void applist_t::on_btUpdate_clicked()
 {
-    QList<fileinfo_t> list;
-    for(int i=0;i<fileinfo_list.count();i++)
+    if( fileinfo_list.count()>0 )
     {
-        fileinfo_t &f = (fileinfo_t&)fileinfo_list.at(i);
-        if( f.info->isFlagSet(appinfo_t::DOWNLOADED) || f.info->isFlagSet(appinfo_t::INSTALLED) )
-            list.append(f);
+        QList<fileinfo_t> list;
+        for(int i=0;i<fileinfo_list.count();i++)
+        {
+            fileinfo_t &f = (fileinfo_t&)fileinfo_list.at(i);
+            if( f.info->isFlagSet(appinfo_t::DOWNLOADED) || f.info->isFlagSet(appinfo_t::INSTALLED) )
+                list.append(f);
+        }
+        if(list.count()==0)
+            list = fileinfo_list;
+        UpdaterDialog dlg(list,UpdaterDialog::update_version);
+        dlg.move( mapToGlobal( this->rect().center()/2 ));
+        if(!this->isVisible())
+            dlg.showMinimized();
+        dlg.exec();
+        QTreeWidgetItem *item = ui->TCategoryTree->findItems(tr("Updates"),Qt::MatchExactly).at(0);
+        ui->TCategoryTree->setCurrentItem(item);
+
+        ui->LAppInfoList->clear();
+        setListByCategory("Updates");
+        if(ui->LAppInfoList->topLevelItemCount()>0)
+            emit versions_available();
     }
-    UpdaterDialog dlg(list,UpdaterDialog::update_version);
-    dlg.move( mapToGlobal( this->rect().center()/2 ));
-    if(!this->isVisible())
-        dlg.showMinimized();
-    dlg.exec();
-    QTreeWidgetItem *item = ui->TCategoryTree->findItems(tr("Updates"),Qt::MatchExactly).at(0);
-    ui->TCategoryTree->setCurrentItem(item);
 }
 
 void applist_t::on_btCheckUpdates_clicked()

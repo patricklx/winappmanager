@@ -24,8 +24,6 @@ private:
     Ui::MainWindow *ui;
     QTimer timer_update;
     QSystemTrayIcon *trayicon;
-    int timerId_tray;
-    int timerId_update;
 
 private slots:
     void on_actionQuit_triggered();
@@ -35,9 +33,11 @@ private slots:
     void on_actionAboutQt_triggered();
 
     void closeEvent(QCloseEvent *);
-    void timerEvent(QTimerEvent *evt = NULL);
+    void timerEvent();
 
     void onTrayDoubleClicked(QSystemTrayIcon::ActivationReason reason = QSystemTrayIcon::DoubleClick);
+    void newVersionMessage();
+    void resetTaskBarIcon();
 };
 
 #endif // MAINWINDOW_H

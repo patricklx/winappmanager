@@ -29,6 +29,22 @@ tasklist_t::tasklist_t(QWidget *parent) :
 
 tasklist_t::~tasklist_t()
 {
+    for(int i=0;i<ui->LTaskList->topLevelItemCount();i++)
+    {
+        task_t *t = ui->LTaskList->topLevelItem(i)->data(0,QTreeWidgetItem::UserType).value<task_t*>();
+        if(t->current_task()==task_t::DOWNLOAD)
+        {
+            t->stop();
+        }
+    }
+    for(int i=0;i<ui->LTaskList->topLevelItemCount();i++)
+    {
+        task_t *t = ui->LTaskList->topLevelItem(i)->data(0,QTreeWidgetItem::UserType).value<task_t*>();
+        if(t->current_task()==task_t::DOWNLOAD)
+        {
+            t->wait();
+        }
+    }
     delete ui;
 }
 
@@ -159,6 +175,7 @@ void tasklist_t::onDownloadFinished()
     t->m_appinfo->DlVersion = t->m_appinfo->LatestVersion;
     t->m_appinfo->downloaded_id = t->m_inet_file.id;
     t->m_appinfo->saveApplicationInfo();
+    t->wait();
 
     on_commandLinkButton_clicked();
 }
@@ -206,7 +223,7 @@ void tasklist_t::on_commandLinkButton_clicked()
             }
         }
 
-        if( ui ->checkAttendet->isChecked() )
+        if( ui->checkAttendet->isChecked() )
         {
             if(downloadList.count()>0)
             {
@@ -238,17 +255,15 @@ void tasklist_t::on_commandLinkButton_clicked()
                 t = silentInstallList[0];
                 if(t->isRunning())
                     return;
-                silentInstallList.removeAt(0);
-                t->start();
                 isInstalling = true;
+                t->start();
             }else if(installList.count() > 0 && downloadSilentList.count()==0)
             {
                 t = installList[0];
                 if(t->isRunning())
                     return;
-                installList.removeAt(0);
-                t->start();
                 isInstalling = true;
+                t->start();
             }
         }
     }
@@ -263,17 +278,15 @@ void tasklist_t::on_commandLinkButton_clicked()
                 t = installList[0];
                 if(t->isRunning())
                     return;
-                installList.removeAt(0);
-                t->start();
                 isInstalling = true;
+                t->start();
             }else if(silentInstallList.count() > 0 && downloadList.count() == 0)
             {
                 t = silentInstallList[0];
                 if(t->isRunning())
                     return;
-                silentInstallList.removeAt(0);
-                t->start();
                 isInstalling = true;
+                t->start();
             }
         }
     }

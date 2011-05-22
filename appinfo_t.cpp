@@ -14,6 +14,7 @@
 #include <QEventLoop>
 #include <QDir>
 #include <QDebug>
+#include <QApplication>
 
 #if !defined(QT_DEBUG)
     QFileIconProvider iconprovider;
@@ -51,12 +52,16 @@ bool appinfo_t::newerVersionAvailable()
 {
     QStringList version1,version2;
     QString v1part2,v2part2;
+    QString InstalledVersion = registry_info.version;
 
     QString v1 = LatestVersion;
     QString v2 = InstalledVersion.isEmpty()?DlVersion:InstalledVersion;
 
 
     if(v1.isEmpty() || v2.isEmpty())
+        return false;
+
+    if(isFlagSet(IGNORE_LATEST))
         return false;
 
     int i;
@@ -119,6 +124,21 @@ bool appinfo_t::newerVersionAvailable()
     return v1 > v2;
 }
 
+bool appinfo_t::forceRegistryToLatestVersion()
+{
+    QSettings values(registry_info.path,QSettings::NativeFormat);
+    qDebug(registry_info.path.toAscii().data());
+    values.setValue(tr("DisplayVersion"),LatestVersion);
+    if( values.status() == QSettings::NoError )
+    {
+        registry_info.version = LatestVersion;
+        unSetFlag(UPDATE_AVAIL);
+        return true;
+    }
+    else
+        return false;
+}
+
 
 void appinfo_t::updateVersion(QNetworkAccessManager *qnam)
 {
@@ -133,25 +153,11 @@ void appinfo_t::updateVersion(QNetworkAccessManager *qnam)
     {
         reply = qnam->get(QNetworkRequest(url));
         reply->setParent(NULL);
+        qDebug(reply->url().toString().toAscii().data());
     }
 
     connect(reply,SIGNAL(finished()),SLOT(onHtmlVersionDownloaded()));
 }
-
-
-bool appinfo_t::forceRegistryToLatestVersion()
-{
-    QSettings values(registry_info.search_term,QSettings::NativeFormat);
-    values.setValue(tr("DisplayVersion"),LatestVersion);
-    if( values.status() == QSettings::NoError )
-    {
-        registry_info.version = LatestVersion;
-        return true;
-    }
-    else
-        return false;
-}
-
 
 void appinfo_t::updateAppInfo()
 {
@@ -198,13 +204,17 @@ void appinfo_t::onHtmlVersionDownloaded()
     QString html;
     QString StartString = version_info.url_find.start;
     QString EndString = version_info.url_find.end;
+    QString InstalledVersion = registry_info.version;
     int start,end;
 
     html = reply->readAll();
-    reply->deleteLater();
+
+    qDebug(tr("updating version of: %1").arg(Name).toAscii().data());
+
 
     if( reply->parent() != NULL )
     {
+        reply->deleteLater();
         reply->manager()->deleteLater();
     }
 
@@ -406,7 +416,6 @@ void appinfo_t::saveApplicationInfo()
         if( node.tagName() == tr("APP_INFO") )
         {
             node.setAttribute(tr("DLversion"),DlVersion);
-            node.setAttribute(tr("installed_version"),InstalledVersion);
             node.setAttribute(tr("id"),downloaded_id);
             node.setAttribute(tr("filename"),fileName);
             node.setAttribute(tr("version"),LatestVersion);
@@ -424,7 +433,6 @@ void appinfo_t::saveApplicationInfo()
     root.appendChild(node);
 
     node.setAttribute(tr("DLversion"),DlVersion);
-    node.setAttribute(tr("installed_version"),InstalledVersion);
     node.setAttribute(tr("id"),downloaded_id);
     node.setAttribute(tr("filename"),fileName);
     node.setAttribute(tr("version"),LatestVersion);
@@ -540,7 +548,6 @@ bool appinfo_t::loadFileInfo()
         if( node.tagName() == tr("APP_INFO") )
         {
             DlVersion           = node.attribute(tr("DLversion"));
-            InstalledVersion    = node.attribute(tr("installed_version"));
             downloaded_id       = node.attribute(tr("id"),tr("-2")).toInt();
             fileName            = node.attribute(tr("filename"));
             LatestVersion       = node.attribute(tr("version"));
@@ -574,12 +581,12 @@ bool appinfo_t::loadFileInfo()
     QFileInfo qfi(Path+tr("/")+fileName);
     if(qfi.exists())
         setFlag(DOWNLOADED);
+    else
+        DlVersion.clear();
 
     if( ParseRegistryInfo() )
-    {
         setFlag(INSTALLED);
-        InstalledVersion = registry_info.version;
-    }
+
 
     if( newerVersionAvailable() )
         setFlag(UPDATE_AVAIL);
@@ -616,6 +623,7 @@ bool appinfo_t::ParseRegistryInfo()
 
     for(int a=0;a<regBase.count();a++)
     {
+        QApplication::processEvents();
         QSettings Registry(regBase[a], QSettings::NativeFormat);
         QStringList childkeys;
 
@@ -633,6 +641,7 @@ bool appinfo_t::ParseRegistryInfo()
         childkeys = Registry.childGroups();
         for(int i=0;i<childkeys.count();i++)
         {
+            QApplication::processEvents();
             if( childkeys.at(i).contains(registry_info.search_term) )
             {
                 path = regBase[a] + childkeys[i];
@@ -642,6 +651,7 @@ bool appinfo_t::ParseRegistryInfo()
             QStringList valuekeys = valuesettings.childKeys();
             for(int j=0;j<valuekeys.count();j++)
             {
+                QApplication::processEvents();
                 if( valuesettings.value( valuekeys.at(j) ).toString().contains(registry_info.search_term) )
                 {
                     path = regBase[a] + childkeys[i];
@@ -667,6 +677,7 @@ bool appinfo_t::ParseRegistryInfo()
 
     next:
     path.replace(tr("/"),tr("\\"));
+    registry_info.path = path;
     QSettings values(path,QSettings::NativeFormat);
 
     registry_info.icon              = values.value(tr("DisplayIcon")).toString().remove(tr(",0"));
@@ -699,6 +710,10 @@ bool appinfo_t::ParseRegistryInfo()
             && registry_info.uninstall.isEmpty() && registry_info.silent_uninstall.isEmpty() )
         return false;
 
-    app_icon = iconprovider.icon(QFileInfo(registry_info.icon));
+    QPixmap pixmap;
+    if( pixmap.load(registry_info.icon) )
+        app_icon = QIcon(pixmap);
+    else
+        app_icon = iconprovider.icon(QFileInfo(registry_info.icon));
     return true;
 }

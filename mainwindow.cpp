@@ -7,6 +7,7 @@
 #include <QDesktopWidget>
 #include "settingsdialog.h"
 #include "choosedialog.h"
+#include <applist_t.h>
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -37,15 +38,23 @@ MainWindow::MainWindow(QWidget *parent) :
 
     trayicon->show();
     trayicon->setContextMenu(menu);
-    timerId_tray = this->startTimer(30*1000);
 
-    timerId_update = timer_update.timerId();
+    connect(ui->Page1Applist,SIGNAL(versions_available()),SLOT(newVersionMessage()));
+
+    QTimer::singleShot(60*1000,this,SLOT(resetTaskBarIcon()));
 }
 
 MainWindow::~MainWindow()
 {
     SettingsDialog::saveSettings();
     delete ui;
+}
+
+
+void MainWindow::resetTaskBarIcon()
+{
+    trayicon->hide();
+    trayicon->show();
 }
 
 void MainWindow::onTrayDoubleClicked(QSystemTrayIcon::ActivationReason reason)
@@ -57,18 +66,19 @@ void MainWindow::onTrayDoubleClicked(QSystemTrayIcon::ActivationReason reason)
     }
 }
 
-void MainWindow::timerEvent(QTimerEvent *evt)
+
+void MainWindow::newVersionMessage()
 {
-    if(evt == NULL)
+    if(!this->isVisible())
     {
-        ui->Page1Applist->on_btUpdate_clicked();
         if(ui->Page1Applist->version_updates_avail)
             trayicon->showMessage(tr("New versions"),tr("There are new versions available for download"));
-    }else
-    {
-        trayicon->hide();
-        trayicon->show();
     }
+}
+
+void MainWindow::timerEvent()
+{
+    ui->Page1Applist->on_btUpdate_clicked();
 }
 
 void MainWindow::closeEvent(QCloseEvent *evt)
@@ -117,7 +127,7 @@ void MainWindow::closeEvent(QCloseEvent *evt)
 
 void MainWindow::on_actionQuit_triggered()
 {
-    close();
+    QApplication::quit();
 }
 
 void MainWindow::on_actionSettings_triggered()
@@ -134,7 +144,7 @@ void MainWindow::on_actionAbout_triggered()
     about = tr("<h3>WinApp_Manager - 11.04</h3>\n") +
             tr("\nWinApp_Manager is a free program. We are grateful\n to SourceForge.net for our project hosting.\nThis Program is available for Windows 98 and later.\n If you want to help keeping the information up to date just go to our homepage and do it :)")+
             tr("\n\n<h3>Licence:</h3>GPL\n")+
-            tr("<h3>Website:</h3> <a href=\"http://sourceforge.net/apps/phpbb/appdriverupdate/\">sourceforge.net/apps/phpbb/appdriverupdate</a>");
+            tr("<h3>Website:</h3> <a href=\"http://appdriverupdate.sourceforge.net/\">sourceforge.net/apps/phpbb/appdriverupdate</a>");
     aboutmsg.setText(about);
     aboutmsg.exec();
 
