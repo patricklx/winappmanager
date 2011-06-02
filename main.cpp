@@ -23,6 +23,7 @@ int main(int argc, char *argv[])
         w.show();
     }
 
-    return a.exec();
+    int ret =  a.exec();
     SettingsDialog::unLoadSettings();
+    return ret;
 }
