@@ -3,6 +3,8 @@
 #include <QLabel>
 #include <QMenu>
 #include <QPointer>
+#include <QUrl>
+#include <QDesktopServices>
 #include <QMessageBox>
 #include "task_t.h"
 #include "tasklist_t.h"
@@ -135,16 +137,18 @@ void tasklist_t::updateProgressInfo(task_t *t,int p,QString text)
 
     item->setText(2,text);
     QProgressBar *pbar = (QProgressBar *) ui->LTaskList->itemWidget(item,0);
-
-    if(p!=-1)
+    if(pbar!=NULL)
     {
-        pbar->setMaximum(100);
-        pbar->setValue(p);
+        if(p!=-1)
+        {
+            pbar->setMaximum(100);
+            pbar->setValue(p);
+        }
+        else
+            pbar->setMaximum(0);
     }
-    else
-        pbar->setMaximum(0);
 
-    ui->LTaskList->resizeColumnToContents(1);
+    ui->LTaskList->resizeColumnToContents(2);
 }
 
 
@@ -152,8 +156,10 @@ void tasklist_t::onDownloadFinished()
 {
     qDebug("download finished successfull");
     task_t *t = (task_t*)sender();
+    t->wait();
 
-    disconnect(t,SIGNAL(finished()),this,SLOT(onDownloadFinished()));
+    t->disconnect();
+    connect(t,SIGNAL(progress(task_t*,int,QString)),SLOT(updateProgressInfo(task_t*,int,QString)));
     dl_inProcess_count--;
     if( t->isSet(task_t::INSTALL) )
     {
@@ -175,7 +181,7 @@ void tasklist_t::onDownloadFinished()
     t->m_appinfo->DlVersion = t->m_appinfo->LatestVersion;
     t->m_appinfo->downloaded_id = t->m_inet_file.id;
     t->m_appinfo->saveApplicationInfo();
-    t->wait();
+
 
     on_commandLinkButton_clicked();
 }
@@ -317,6 +323,9 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
         menu.addAction(tr("force installed version to latest"));
     }
 
+    menu.addSeparator();
+    menu.addAction(tr("open containing folder"));
+
     menu.move(ui->LTaskList->mapToGlobal(pos)+QPoint(0,25));
     QAction *action = menu.exec();
     if(action==NULL)
@@ -362,8 +371,11 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
         else
             updateProgressInfo(task,100,tr("successfully set to latest version"));
     }
+
+    if( action->text() == tr("open containing folder"))
+    {
+        QDesktopServices::openUrl(tr("file:///%1").arg(task->m_appinfo->Path));
+    }
 }
-
-
 
 
