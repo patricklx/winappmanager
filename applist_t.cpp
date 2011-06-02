@@ -181,7 +181,6 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
         emit taskChosen(task);
         info->setFlag(appinfo_t::SELECTED_INST_DL);
         item->setIcon(0,info->getIcon());
-
     }
 
     if( action->text() == tr("Execute installer"))
@@ -725,7 +724,11 @@ void applist_t::on_btUpdate_clicked()
         if(!this->isVisible())
             dlg.showMinimized();
         dlg.exec();
-        QTreeWidgetItem *item = ui->TCategoryTree->findItems(tr("Updates"),Qt::MatchExactly).at(0);
+        QList<QTreeWidgetItem*> items = ui->TCategoryTree->findItems(tr("Updates"),Qt::MatchExactly);
+        if(items.count()==0)
+            return;
+        QTreeWidgetItem *item = items[0];
+
         ui->TCategoryTree->setCurrentItem(item);
 
         ui->LAppInfoList->clear();
@@ -737,7 +740,10 @@ void applist_t::on_btUpdate_clicked()
 
 void applist_t::on_btCheckUpdates_clicked()
 {
-    QTreeWidgetItem *item = ui->TCategoryTree->findItems(tr("Updates"),Qt::MatchExactly).at(0);
+    QList<QTreeWidgetItem*> items = ui->TCategoryTree->findItems(tr("Updates"),Qt::MatchExactly);
+    if(items.count()==0)
+        return;
+    QTreeWidgetItem *item = items[0];
     ui->TCategoryTree->setCurrentItem(item,0,QItemSelectionModel::ClearAndSelect);
 
     for(int i=0;i<ui->LAppInfoList->topLevelItemCount();i++)
@@ -768,7 +774,10 @@ void applist_t::on_btUpdateInfo_clicked()
             info_updates_avail = false;
             ui->btUpdateInfo->setIcon(QIcon(tr(":icons/isnew.ico")));
             saveList();
-            QTreeWidgetItem *item = ui->TCategoryTree->findItems(tr("New/Updated"),Qt::MatchExactly).at(0);
+            QList<QTreeWidgetItem*> items = ui->TCategoryTree->findItems(tr("New/Updated"),Qt::MatchExactly);
+            if(items.count()==0)
+                return;
+            QTreeWidgetItem *item = items[0];
             ui->TCategoryTree->setCurrentItem(item,0,QItemSelectionModel::ClearAndSelect);
         }
     }else
