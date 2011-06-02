@@ -181,7 +181,8 @@ void appinfo_t::onHtmlAppInfoDownloaded()
         return;
     }
     reply->deleteLater();
-    reply->manager()->deleteLater();
+    if(reply->manager())
+        reply->manager()->deleteLater();
 
     QFile file(tr("Info/")+Name+tr(".xml"));
 
@@ -215,7 +216,8 @@ void appinfo_t::onHtmlVersionDownloaded()
     if( reply->parent() != NULL )
     {
         reply->deleteLater();
-        reply->manager()->deleteLater();
+        if(reply->manager())
+            reply->manager()->deleteLater();
     }
 
     if(html.isEmpty())
@@ -578,10 +580,14 @@ bool appinfo_t::loadFileInfo()
 
     Path = QDir::currentPath() + tr("/") + Path + Name;
 
-    QFileInfo qfi(Path+tr("/")+fileName);
-    if(qfi.exists())
-        setFlag(DOWNLOADED);
-    else
+    if(!fileName.isEmpty())
+    {
+        QFileInfo qfi(Path+tr("/")+fileName);
+        if(qfi.exists())
+            setFlag(DOWNLOADED);
+        else
+            DlVersion.clear();
+    }else
         DlVersion.clear();
 
     if( ParseRegistryInfo() )
@@ -717,3 +723,4 @@ bool appinfo_t::ParseRegistryInfo()
         app_icon = iconprovider.icon(QFileInfo(registry_info.icon));
     return true;
 }
+
