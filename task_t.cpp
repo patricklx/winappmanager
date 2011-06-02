@@ -211,9 +211,10 @@ bool task_t::download()
 {
     emit progress(this,0,tr("Checking latest version first..."));
     QEventLoop loop;
+    QNetworkAccessManager manager;
     connect(m_appinfo,SIGNAL(infoUpdated(appinfo_t*,bool)),&loop,SLOT(quit()));
 
-    m_appinfo->updateVersion();
+    m_appinfo->updateVersion(&manager);
     loop.exec();
 
     emit progress(this,0,tr("Starting Download..."));
@@ -270,7 +271,6 @@ bool task_t::download()
             proc.waitForReadyRead();
 
             info = proc.readAll();
-
 
             fullinfo = fullinfo + info;
 
@@ -330,7 +330,7 @@ bool task_t::download()
 
                 t = prcstr.toInt(&ok);
                 if( !ok )
-                    prcstr.remove(0,1 );
+                    prcstr.remove(0,1);
 
                 t = prcstr.toInt(&ok);
                 if(!info.contains('\n'))
@@ -346,6 +346,7 @@ bool task_t::download()
             }
         }
     }
+    emit progress(this,0,tr("an unkown error occurred! Delete the downloaded files in the containing folder and try again"));
     return false;
 }
 
