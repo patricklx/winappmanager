@@ -101,8 +101,6 @@ SettingsDialog::~SettingsDialog()
 
 void SettingsDialog::on_btApply_clicked()
 {
-    ui->maxtaskCount->setValue(simulDownloadCount());
-
     settings->setValue(tr("CHECK_VERSIONS"),ui->checklatestversion->isChecked());
     settings->setValue(tr("CHECK_INFO"),ui->checkupdates->isChecked());
     settings->setValue(tr("DOWNLOAD_COUNT"),ui->maxtaskCount->value());
@@ -167,6 +165,7 @@ void SettingsDialog::on_btApply_clicked()
         setNetworkProxy();
     }else
         settings->setValue(tr("PROXY_ENABLED"),false);
+
     saveSettings();
     close();
 }
@@ -189,7 +188,7 @@ QNetworkProxy SettingsDialog::getProxySettings()
 
 void SettingsDialog::loadSettings()
 {
-    settings = new QSettings(QString("WinAppM_settings.ini"),QSettings::IniFormat);
+    settings = new QSettings("WinAppM_settings.ini",QSettings::IniFormat);
     setNetworkProxy();
 }
 
@@ -247,12 +246,12 @@ bool SettingsDialog::startsWithSystem()
 }
 int SettingsDialog::simulDownloadCount()
 {
-    return settings->value(tr("DOWNLOAD_COUNT"),3).toInt();
+    return settings->value("DOWNLOAD_COUNT",3).toInt();
 }
 
 QDate SettingsDialog::lastInfoUpdate()
 {
-    return settings->value(tr("LAST_INFO_CHECK"),0).toDate();
+    return settings->value("LAST_INFO_CHECK",0).toDate();
 }
 
 void SettingsDialog::setLastInfoUpdate(QDate date)
