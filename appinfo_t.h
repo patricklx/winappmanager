@@ -6,6 +6,8 @@
 #include <QIcon>
 #include <QNetworkAccessManager>
 
+#include "appinfo_registry_t.h"
+
 class appinfo_t : public QObject
 {
     Q_OBJECT
@@ -23,19 +25,43 @@ public:
         SELECTED_REM        = 0x0008,
         SELECTED_INST_DL    = 0x0010,
         NO_REGISTRY         = 0x0020,
-        SILENT              = 0x0040,
+	ONLY_SILENT         = 0x0040, //Ex: Chrome,uTorrent
         ONLY_INFO           = 0x0080,
         NEW                 = 0x0100,
-        IGNORE_LATEST       = 0x0200,
-        ONLY_SILENT         = 0x0400  //Ex: Chrome
+        IGNORE_LATEST       = 0x0200,  
+	ADMIN               = 0x0400,  //Ex: uTorrent
+	NEEDS_UNINSTALL     = 0x0800,  //Ex: Firefox,CDburnerXP sometimes don't remove old registry info
+	NO_INFO             = 0x1000,
+	FILEHIPPO_BETA	    = 0x2000
     };
 
-    struct url_find_t{QString start;QString end;};
-    struct inet_file_t{
-        int id;
+    struct registry_info_t{
+        QString regex;
+        QString regexReplace;
+        QString path;
+	QString seachValue;
+        QString version_path;
+        QString version;
+        QString icon;
+        QString silent_uninstall;
+        QString uninstall;
+	QString displayName;
+    };
+
+    struct inet_version_t{
+        QString url,
+                urlRegEx;
+
+        QString versionRegEx,
+                regExReplace;
+    };
+
+    struct file_info_t{
+	int id;
         QString url;
         QString description;
-        QList<url_find_t> follow_urls;
+        QStringList follow_urls_regex;
+	file_info_t():id(-1){}
     };
 
     QList<QString> categories;
@@ -43,25 +69,33 @@ public:
     QString LatestVersion,
             DlVersion,
             LastVersionCheck,
+            InstalledVersion,
             Path,
             Description,
             Info,
             WebPage,
             fileName;
+    QString install_param;
+    QString uninstall_param;
+    QString uninstall_lastProcessName;
+    QString install_lastProcessName;
     int downloaded_id;
-    QList<inet_file_t> inet_files;
+    QList<file_info_t> inet_files;
+    registry_info_t registry_info;
+    inet_version_t version_info;
 
-    void updateVersion(QNetworkAccessManager *qnam = 0);
+    QNetworkReply* updateVersion(QNetworkAccessManager *qnam = 0);
     bool loadFileInfo();
-    QString getDownloadURL(inet_file_t &inet_file);
+    QString getDownloadURL(file_info_t &inet_file);
     QIcon getIcon();
-    inet_file_t getFileInfoByDlId();
+    file_info_t getFileInfoByDlId();
     bool forceRegistryToLatestVersion();
 
     bool isFlagSet(enum appinfo_flags flag);
     void setFlag(enum appinfo_flags flag);
     void unSetFlag(appinfo_t::appinfo_flags flag);
     bool ParseRegistryInfo();
+    bool checkInstall();
     void saveApplicationInfo();
     void updateAppInfo();
 
@@ -69,35 +103,13 @@ public:
 
     bool newerVersionAvailable();
 
-    struct registry_info_t{
-        QString path;
-        QString search_term;
-        QString version_path;
-        QString version;
-        QString icon_path;
-        QString icon;
-        QString silent_uninstall;
-        QString silent_uninstall_path;
-        QString uninstall_path;
-        QString uninstall;
-    };
-    struct registry_info_t registry_info;
+    void setRegistryInfo(registry_group_t *reg_group);
 
-    QString install_param;
-    QString uninstall_param;
-    QString uninstall_follow;
-    QString install_follow;
+    void setFilehippoBeta(bool enable);
 
 private:
 
-    struct inet_version_t{
-        QString url,
-                layout;
-        url_find_t url_find;
-    };
-
     enum appinfo_flags state;
-    inet_version_t version_info;
     QIcon app_icon;
 
 
@@ -107,6 +119,8 @@ signals:
 private slots:
     void onHtmlVersionDownloaded();
     void onHtmlAppInfoDownloaded();
+
+    void delayedSetIcon();
 };
 
 #endif // APPINFO_T_H

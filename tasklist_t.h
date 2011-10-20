@@ -20,6 +20,7 @@ public:
 
 signals:
     void onTaskRemoved(appinfo_t *info);
+    void updateAppInfo(appinfo_t *info);
 
 public slots:
     void addTask(task_t *task);
@@ -39,11 +40,14 @@ private:
     QList<task_t*> installList;
     QList<task_t*> silentInstallList;
 
-    QList<task_t*> downloadSilentList;
     QList<task_t*> downloadList;
+    QList<task_t*> downloadSilentList;
 
-    int dl_inProcess_count;
-    int downloading_count;
+    task_t* winapp_manager;
+
+
+    int download_count;
+    int silentdownload_count;
     bool isInstalling;
 };
 

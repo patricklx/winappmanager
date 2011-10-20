@@ -15,16 +15,19 @@
 #include <QDir>
 #include <QDebug>
 #include <QApplication>
+#include <appinfo_registry_t.h>
+#include <QTimer>
+#include <QDomCDATASection>
 
 #if !defined(QT_DEBUG)
-    QFileIconProvider iconprovider;
+QFileIconProvider iconprovider;
 #endif
 
 appinfo_t::appinfo_t(QString app_name):
     QObject(NULL)
 {
     Name = app_name;
-    state = ONLY_INFO;
+    state = INVALID;
     downloaded_id = -1;
 }
 
@@ -128,7 +131,7 @@ bool appinfo_t::forceRegistryToLatestVersion()
 {
     QSettings values(registry_info.path,QSettings::NativeFormat);
     qDebug(registry_info.path.toAscii().data());
-    values.setValue(tr("DisplayVersion"),LatestVersion);
+    values.setValue("DisplayVersion",LatestVersion);
     if( values.status() == QSettings::NoError )
     {
         registry_info.version = LatestVersion;
@@ -140,32 +143,39 @@ bool appinfo_t::forceRegistryToLatestVersion()
 }
 
 
-void appinfo_t::updateVersion(QNetworkAccessManager *qnam)
+QNetworkReply* appinfo_t::updateVersion(QNetworkAccessManager *qnam)
 {
     QString url = version_info.url;
     QNetworkReply *reply;
+    QNetworkRequest request = QNetworkRequest(url);
+    if(url.contains("filehippo") && !isFlagSet(FILEHIPPO_BETA))
+        request.setRawHeader("Cookie","Filter=NOBETA=1&NODEMO=0");
+
     if(qnam == NULL)
     {
         qnam = new QNetworkAccessManager;
-        reply= qnam->get(QNetworkRequest(url));
+        reply= qnam->get(request);
 
     }else
     {
-        reply = qnam->get(QNetworkRequest(url));
+        reply = qnam->get(request);
         reply->setParent(NULL);
-        qDebug(reply->url().toString().toAscii().data());
+        qDebug(reply->url().toString().toAscii());
     }
 
     connect(reply,SIGNAL(finished()),SLOT(onHtmlVersionDownloaded()));
+    return reply;
 }
 
 void appinfo_t::updateAppInfo()
 {
-    QString url = tr("http://appdriverupdate.sourceforge.net/Files/")+Name+tr(".xml");
+    QString url = "http://appdriverupdate.sourceforge.net/Apps/Files/"+Name+".xml";
 
     QNetworkAccessManager *qnam = new QNetworkAccessManager;
 
-    QNetworkReply *reply = qnam->get(QNetworkRequest(url));
+    QNetworkRequest request = QNetworkRequest(url);
+
+    QNetworkReply *reply = qnam->get(request);
     connect(reply,SIGNAL(finished()),SLOT(onHtmlAppInfoDownloaded()));
 }
 
@@ -184,7 +194,7 @@ void appinfo_t::onHtmlAppInfoDownloaded()
     if(reply->manager())
         reply->manager()->deleteLater();
 
-    QFile file(tr("Info/")+Name+tr(".xml"));
+    QFile file("Info/"+Name+".xml");
 
     if( !file.open(QFile::WriteOnly) )
     {
@@ -203,15 +213,15 @@ void appinfo_t::onHtmlVersionDownloaded()
 {
     QNetworkReply *reply = (QNetworkReply*) sender();
     QString html;
-    QString StartString = version_info.url_find.start;
-    QString EndString = version_info.url_find.end;
-    QString InstalledVersion = registry_info.version;
-    int start,end;
+    QString version;
+    QString regexString = version_info.urlRegEx;
+    QRegExp regex(regexString);
+    regex.setMinimal(true);
+
 
     html = reply->readAll();
 
     qDebug(tr("updating version of: %1").arg(Name).toAscii().data());
-
 
     if( reply->parent() != NULL )
     {
@@ -223,42 +233,31 @@ void appinfo_t::onHtmlVersionDownloaded()
     if(html.isEmpty())
         qDebug("html empty "+reply->url().toString().toAscii());
 
-    start = html.indexOf(StartString);
-    if(start==-1)
+    qDebug(regexString.toAscii());
+
+    regex.indexIn(html);
+    version = regex.cap(1);
+
+    if(version.isEmpty())
     {
+        qDebug("no version found: %s",regex.errorString().toAscii().data());
         infoUpdated(this,false);
         return;
     }
 
-    start = start + StartString.length();
-    html.remove(0, start );
-    end = html.indexOf(EndString);
 
-    if(end == -1)
-    {
-        infoUpdated(this,false);
-        return;
-    }
-    QString fullversion = html.mid(0,end).beforeFirst(' ');
+    regexString = version_info.versionRegEx;
+    qDebug(regexString.toAscii());
+    qDebug(version.toAscii());
 
-    QString layout = version_info.layout;
-    QString version;
+    regex.setPattern(regexString);
+    regex.setMinimal(false);
 
-    int  i;
-    for(i=0; i < layout.length(); i++)
-    {
-        if( layout[i] == 'x' || layout[i] == '.')
-        {
-            version += fullversion[i];
-        }
-    }
+    version = version.replace(regex,version_info.regExReplace);
 
     LatestVersion = version;
 
-    if(LatestVersion.isEmpty())
-        LatestVersion = fullversion;
-
-    if(!InstalledVersion.isEmpty() && newerVersionAvailable())
+    if( !InstalledVersion.isEmpty() && newerVersionAvailable())
     {
         setFlag(UPDATE_AVAIL);
     }
@@ -271,7 +270,7 @@ void appinfo_t::onHtmlVersionDownloaded()
         unSetFlag(UPDATE_AVAIL);
     }
 
-    LastVersionCheck = QDate::currentDate().toString(tr("dd/MM/yy"));
+    LastVersionCheck = QDate::currentDate().toString("dd/MM/yy");
     saveApplicationInfo();
 
     emit infoUpdated(this,true);
@@ -298,7 +297,16 @@ bool appinfo_t::contains(QStringList &strings)
     return true;
 }
 
-appinfo_t::inet_file_t appinfo_t::getFileInfoByDlId()
+void appinfo_t::setFilehippoBeta(bool enable)
+{
+    if(enable)
+        setFlag(FILEHIPPO_BETA);
+    else
+        unSetFlag(FILEHIPPO_BETA);
+    saveApplicationInfo();
+}
+
+appinfo_t::file_info_t appinfo_t::getFileInfoByDlId()
 {
     qDebug("downloaded_id:%d",downloaded_id);
     for(int i=0;i<inet_files.count();i++)
@@ -308,46 +316,50 @@ appinfo_t::inet_file_t appinfo_t::getFileInfoByDlId()
         if( inet_files[i].id == downloaded_id )
             return inet_files[i];
     }
-    inet_file_t f;
+    file_info_t f;
     return f;
 }
 
-QString appinfo_t::getDownloadURL(inet_file_t &inet_file)
+QString appinfo_t::getDownloadURL(file_info_t &inet_file)
 {
     QString url = inet_file.url;
-    url.replace(tr("{version}"),LatestVersion);
+    url.replace("{version}",LatestVersion);
 
-    for(int i=0;i<inet_file.follow_urls.count();i++)
+    for(int i=0;i<inet_file.follow_urls_regex.count();i++)
     {
         QUrl baseurl(url);
         QString html;
         QEventLoop eventloop;
-        QString StartString = inet_file.follow_urls[i].start;
-        QString EndString = inet_file.follow_urls[i].end;
+        QString regexString = inet_file.follow_urls_regex[i];
+        QRegExp regex(regexString);
+        regex.setMinimal(true);
+        qDebug(regexString.toAscii());
 
         QNetworkAccessManager qnam;
-        QNetworkReply *reply = qnam.get(QNetworkRequest(url));
+        QNetworkRequest request = QNetworkRequest(url);
+        if(url.contains("filehippo") && !isFlagSet(FILEHIPPO_BETA))
+            request.setRawHeader("Cookie","Filter=NOBETA=1&NODEMO=0");
+        QNetworkReply *reply = qnam.get(request);
         connect(reply,SIGNAL(finished()),&eventloop,SLOT(quit()));
 
         qDebug(baseurl.toString().toAscii());
 
         eventloop.exec();
 
-        html += reply->readAll();
+        html = reply->readAll();
 
         if(!html.isEmpty())
         {
-            int start,end;
-            QString urlstr;
-            start = html.indexOf(StartString);
-            if(start==-1)  return tr("");
+            int index = regex.indexIn(html);
+            if( index == -1)
+            {
+                qDebug(html.toAscii());
+                qDebug("regex on url failed");
+                return "";
+            }
 
-            start = start + StartString.length();
-            html.remove(0,start);
-            end = html.indexOf(EndString);
+            QString urlstr = regex.cap(1);
 
-            if(end == -1) return tr("");
-            urlstr = html.mid(0,end);
             QUrl url_resolve(urlstr);
             qDebug(urlstr.toAscii());
 
@@ -360,7 +372,8 @@ QString appinfo_t::getDownloadURL(inet_file_t &inet_file)
         }
         else
         {
-            return tr("");
+            qDebug("html is empty");
+            return "";
         }
     }
     return url;
@@ -372,39 +385,40 @@ QIcon appinfo_t::getIcon()
     QFileIconProvider iconprovider;
 #endif
     if( isFlagSet(SELECTED_INST_DL) )
-        return QIcon(tr(":icons/Download.ico"));
+        return QIcon(":icons/Download.ico");
 
     if( isFlagSet(SELECTED_REM) )
-        return QIcon(tr(":icons/Remove.ico"));
+        return QIcon(":icons/Remove.ico");
 
     if( isFlagSet(UPDATE_AVAIL) )
-        return QIcon(tr(":icons/hasupdate.ico"));
+        return QIcon(":icons/hasupdate.ico");
 
     if( isFlagSet(INSTALLED) )
     {
         if( registry_info.icon.isEmpty() )
-            return QIcon(tr(":icons/IsInstalled.ico"));
+            return QIcon(":icons/IsInstalled.ico");
         if( app_icon.isNull() )
-            return QIcon(tr(":icons/IsInstalled.ico"));
+            return QIcon(":icons/IsInstalled.ico");
         else
             return app_icon;
     }
 
     if( isFlagSet(DOWNLOADED) )
-        return QIcon(tr(":icons/IsDL.ico"));
+        return QIcon(":icons/IsDL.ico");
 
     if( isFlagSet(NEW) || isFlagSet(ONLY_INFO) )
-        return QIcon(tr(":icons/isnew.ico"));
+        return QIcon(":icons/isnew.ico");
 
-    return QIcon();
+    return QIcon(":icons/isnew.ico");
 }
 
 
 void appinfo_t::saveApplicationInfo()
 {
-    QFile xmldoc(tr("Info/")+Name+tr(".xml"));
+    QFile xmldoc("Info/"+Name+".xml");
     if( !xmldoc.open(QFile::ReadOnly) )
         return;
+
 
     QDomDocument doc;
     if ( !doc.setContent(xmldoc.readAll(),false) )
@@ -415,15 +429,16 @@ void appinfo_t::saveApplicationInfo()
     QDomElement node = root.firstChildElement();
     while( !node.isNull() )
     {
-        if( node.tagName() == tr("APP_INFO") )
+        if( node.tagName() == "APP_INFO" )
         {
-            node.setAttribute(tr("DLversion"),DlVersion);
-            node.setAttribute(tr("id"),downloaded_id);
-            node.setAttribute(tr("filename"),fileName);
-            node.setAttribute(tr("version"),LatestVersion);
-            node.setAttribute(tr("LastCheck"),LastVersionCheck);
-            node.setAttribute(tr("isNew"),isFlagSet(NEW));
-            node.setAttribute(tr("ignore_latest_version"),isFlagSet(IGNORE_LATEST));
+            node.setAttribute("DLversion",DlVersion);
+            node.setAttribute("id",downloaded_id);
+            node.setAttribute("filename",fileName);
+            node.setAttribute("version",LatestVersion);
+            node.setAttribute("LastCheck",LastVersionCheck);
+            node.setAttribute("isNew",isFlagSet(NEW));
+            node.setAttribute("ignore_latest_version",isFlagSet(IGNORE_LATEST));
+            node.setAttribute("filehippoBeta",isFlagSet(FILEHIPPO_BETA));
             xmldoc.open(QFile::WriteOnly);
             xmldoc.write( doc.toString().toUtf8() );
             return;
@@ -431,23 +446,28 @@ void appinfo_t::saveApplicationInfo()
         node = node.nextSiblingElement();
     }
     //if not found add APP_INFO
-    node = doc.createElement(tr("APP_INFO"));
+    node = doc.createElement("APP_INFO");
     root.appendChild(node);
 
-    node.setAttribute(tr("DLversion"),DlVersion);
-    node.setAttribute(tr("id"),downloaded_id);
-    node.setAttribute(tr("filename"),fileName);
-    node.setAttribute(tr("version"),LatestVersion);
-    node.setAttribute(tr("LastCheck"),LastVersionCheck);
-    node.setAttribute(tr("isNew"),isFlagSet(NEW));
-    node.setAttribute(tr("ignore_latest_version"),isFlagSet(IGNORE_LATEST));
+    node.setAttribute("DLversion",DlVersion);
+    node.setAttribute("id",downloaded_id);
+    node.setAttribute("filename",fileName);
+    node.setAttribute("version",LatestVersion);
+    node.setAttribute("LastCheck",LastVersionCheck);
+    node.setAttribute("isNew",isFlagSet(NEW));
+    node.setAttribute("ignore_latest_version",isFlagSet(IGNORE_LATEST));
+    node.setAttribute("filehippoBeta",isFlagSet(FILEHIPPO_BETA));
     xmldoc.open(QFile::WriteOnly);
     xmldoc.write( doc.toString().toUtf8() );
 }
 
+
+
+
+
 bool appinfo_t::loadFileInfo()
 {
-    QFile xmldoc(tr("Info/")+Name+tr(".xml"));
+    QFile xmldoc("Info/"+Name+".xml");
     if( !xmldoc.open(QFile::ReadOnly) )
     {
         qDebug() << "failed to load" << Name;
@@ -466,37 +486,31 @@ bool appinfo_t::loadFileInfo()
 
     QDomElement node = doc.documentElement();
 
-    Description = node.attribute(tr("DESCRIPTION"));
-    Info        = node.attribute(tr("INFO"));
-    WebPage     = node.attribute(tr("WEBPAGE"));
+    Description = node.firstChildElement("DESCRIPTION").firstChild().nodeValue();
+    Info        = node.firstChildElement("INFO").firstChild().nodeValue();
+    WebPage     = node.firstChildElement("WEBPAGE").firstChild().nodeValue();
 
     node = node.firstChildElement();
 
     while( !node.isNull() )
     {
-        if( node.tagName() == tr("VERSION") )
+        if( node.tagName() == "FILELIST" )
         {
-            version_info.url            = node.attribute(tr("url"));
-            version_info.layout         = node.attribute(tr("version_layout"));
-            version_info.url_find.end   = node.attribute(tr("EndString"));
-            version_info.url_find.start = node.attribute(tr("StartString"));
-        }
-        if( node.tagName() == tr("FILELIST") )
-        {
-            QString url = node.attribute(tr("url"));
-            QDomElement child = node.firstChildElement();
+            QString url = node.firstChildElement("url").firstChild().nodeValue();
+            QDomElement child = node.firstChildElement("FILE");
 
             inet_files.clear();
 
             while(!child.isNull())
             {
-                inet_file_t tmp;
-                QString url2    = child.attribute(tr("url"));
-                tmp.url         = url2.isEmpty()? url : url2;
-                tmp.description = child.attribute(tr("Description"));
-                tmp.id          = child.attribute(tr("id")).toInt();
+                file_info_t tmp;
+                QString url2    = child.firstChildElement("url").firstChild().nodeValue();
 
-                QDomElement replace_str = child.firstChildElement(tr("UrlInfo"));
+                tmp.url         = url.isEmpty()? url2 : url;
+                tmp.description = child.attribute("Description");
+                tmp.id          = child.attribute("id").toInt();
+
+                QDomElement replace_str = child.firstChildElement("UrlInfo");
                 while(!replace_str.isNull())
                 {
                     QDomNamedNodeMap attributes = replace_str.attributes();
@@ -506,83 +520,142 @@ bool appinfo_t::loadFileInfo()
                         QString replace_with = attributes.item(i).nodeValue();
                         tmp.url.replace(tr("{%1}").arg(replace_what),replace_with);
                     }
-                    replace_str = replace_str.nextSiblingElement(tr("UrlInfo"));
+                    replace_str = replace_str.nextSiblingElement("UrlInfo");
                 }
 
 
-                QDomElement follow_urls = child.firstChildElement(tr("FOLLOW_LINK"));
+                QDomElement follow_urls = child.lastChildElement("FOLLOW_LINK");
                 while(!follow_urls.isNull())
                 {
-                    url_find_t url_find;
-                    url_find.start  = follow_urls.attribute(tr("StartString"));
-                    url_find.end    = follow_urls.attribute(tr("EndString"));
-                    tmp.follow_urls.append(url_find);
+                    QString regex =  follow_urls.lastChildElement("regex").firstChild().nodeValue();
 
-                    follow_urls = follow_urls.firstChildElement();
+                    if(regex.isEmpty())
+                    {
+                        QString StartString = follow_urls.lastChildElement("StartString").firstChild().nodeValue();
+                        QString EndString   = follow_urls.lastChildElement("EndString").firstChild().nodeValue();
+                        regex               = QRegExp::escape(StartString) + "(\\S*)" + QRegExp::escape(EndString);
+                    }
+                    tmp.follow_urls_regex.append(regex);
+                    follow_urls = follow_urls.lastChildElement("FOLLOW_LINK");
                 }
 
                 inet_files.append(tmp);
-                child = child.nextSiblingElement();
+                child = child.nextSiblingElement("FILE");
             }
         }
 
-        if( node.tagName() == tr("REGISTRY") )
+        if( node.tagName() == "VERSION" )
         {
-            registry_info.icon_path              = node.attribute(tr("icon"));
-            registry_info.search_term                   = node.attribute(tr("path"));
-            registry_info.silent_uninstall_path  = node.attribute(tr("silent_uninstall")) ;
-            registry_info.uninstall_path         = node.attribute(tr("uninstall"));
-            registry_info.version_path           = node.attribute(tr("version"));
+            version_info.url = node.lastChildElement("url").firstChild().nodeValue();
+            version_info.urlRegEx = node.lastChildElement("regex").firstChild().nodeValue();
+
+
+            if(version_info.urlRegEx.isEmpty())
+            {
+                qDebug("%s empty regex",Name.toAscii().data());
+                QString StartString       = node.lastChildElement("StartString").firstChild().nodeValue();
+                QString EndString         = node.lastChildElement("EndString").firstChild().nodeValue();
+
+                version_info.urlRegEx     = QRegExp::escape(StartString) + "(.{1,20})" + QRegExp::escape(EndString);
+            }
+            qDebug("'%s'",version_info.urlRegEx.toAscii().data());
+
+            version_info.versionRegEx = node.lastChildElement("versionRegEx").firstChild().nodeValue();
+            if(version_info.versionRegEx.isEmpty())
+                version_info.versionRegEx = "(\\S*)(.*)";
+
+            version_info.regExReplace = node.lastChildElement("versionRegExReplace").firstChild().nodeValue();
+            if(version_info.regExReplace.isEmpty())
+                version_info.regExReplace = "\\1";
+
+            if(node.attribute("filehippoBeta",0).toInt()==1)
+                setFlag(FILEHIPPO_BETA);
+        }
+
+        if( node.tagName() == "REGISTRY" )
+        {
+            registry_info.seachValue.clear();
+            registry_info.version_path.clear();
+            registry_info.path.clear();
+            registry_info.version.clear();
+
+            if( QSysInfo::WordSize == 64 )
+            {
+                registry_info.seachValue  = node.attribute("search64").toUpper();
+                registry_info.version_path = node.attribute("version64").toUpper();
+            }
+
+            if(registry_info.seachValue.isEmpty())
+                registry_info.seachValue  = node.attribute("search").toUpper();
+
+
+            if(registry_info.version_path.isEmpty())
+                registry_info.version_path = node.attribute("version").toUpper();
+
+            registry_info.regex        = node.attribute("versionRegEx","(\\S*)(.*)");
+            registry_info.regexReplace = node.attribute("regexReplace","\\1");
             /*path or version must be set to check if it's installed*/
         }
 
-        if( node.tagName() == tr("INSTALL") )
+        if( node.tagName() == "INSTALL" )
         {
-            install_param = node.attribute(tr("params")).trimmed();
-            install_follow= node.attribute(tr("FollowPrc"));
+            node.removeAttribute("time");
+            if( node.attribute("silent").toInt()==1 )
+                setFlag(ONLY_SILENT);
+            if( node.attribute("admin").toInt()==1 )
+                setFlag(ADMIN);
+            if( node.attribute("needs_uninstall").toInt() == 1)
+                setFlag(NEEDS_UNINSTALL);
+
+            install_param = node.attribute("params").trimmed();
+            install_lastProcessName = node.attribute("lastProcessName");
         }
-        if( node.tagName() == tr("REMOVE") )
+        if( node.tagName() == "REMOVE" )
         {
-            uninstall_param = node.attribute(tr("params")).trimmed();
-            uninstall_follow= node.attribute(tr("FollowPrc"));
+            node.removeAttribute("time");
+            uninstall_param = node.attribute("params").trimmed();
+            uninstall_lastProcessName = node.attribute("lastProcessName");
         }
 
-        if( node.tagName() == tr("APP_INFO") )
+        if( node.tagName() == "APP_INFO" )
         {
-            DlVersion           = node.attribute(tr("DLversion"));
-            downloaded_id       = node.attribute(tr("id"),tr("-2")).toInt();
-            fileName            = node.attribute(tr("filename"));
-            LatestVersion       = node.attribute(tr("version"));
-            LastVersionCheck    = node.attribute(tr("LastCheck"));
-            bool ok = node.attribute(tr("isNew"),tr("0")).toInt();
+            DlVersion           = node.attribute("DLversion");
+            downloaded_id       = node.attribute("id","-2").toInt();
+            fileName            = node.attribute("filename");
+            LatestVersion       = node.attribute("version");
+            LastVersionCheck    = node.attribute("LastCheck");
+            bool ok = node.attribute("isNew","0").toInt();
             if(ok)setFlag(NEW);
-            ok = node.attribute(tr("ignore_latest_version"),tr("0")).toInt();
+            ok = node.attribute("ignore_latest_version","0").toInt();
             if(ok)setFlag(IGNORE_LATEST);
+            ok = node.attribute("filehippoBeta","0").toInt();
+            if(ok)setFlag(FILEHIPPO_BETA);
         }
 
-        if( node.tagName() == tr("CATEGORYS"))
+        if( node.tagName() == "CATEGORYS")
         {
             QDomElement child = node.firstChildElement();
             while(!child.isNull())
             {
-                categories.append(child.attribute(tr("id")));
+                QString category = child.firstChild().nodeValue();
+                categories.append(category);
                 child = child.nextSiblingElement();
             }
         }
         node = node.nextSiblingElement();
     }
 
-    Path = tr("Files/");
+    Path = "Files/";
     for (int index = 0; index<categories.count(); index++)
     {
-        Path=Path + categories[index] + tr("/") ;
+        Path=Path + categories[index] + "/" ;
     }
 
-    Path = QDir::currentPath() + tr("/") + Path + Name;
+    Path = QDir::currentPath() + "/" + Path + Name;
 
     if(!fileName.isEmpty())
     {
-        QFileInfo qfi(Path+tr("/")+fileName);
+        QFileInfo qfi(Path+"/"+fileName);
         if(qfi.exists())
             setFlag(DOWNLOADED);
         else
@@ -590,20 +663,93 @@ bool appinfo_t::loadFileInfo()
     }else
         DlVersion.clear();
 
-    if( ParseRegistryInfo() )
-        setFlag(INSTALLED);
-
+    if( registry_info.seachValue.contains("\\") || registry_info.version_path.contains("\\") )
+    {
+        qDebug("parse registry for: %s",Name.toAscii().data());
+        if(ParseRegistryInfo())
+            setFlag(INSTALLED);
+    }
 
     if( newerVersionAvailable() )
         setFlag(UPDATE_AVAIL);
 
-    if(install_param == tr("ALWAYS"))
+    if(install_param == "ALWAYS")
         setFlag(ONLY_SILENT);
 
-    if(!isFlagSet(DOWNLOADED) && !isFlagSet(INSTALLED))
+    if(!isFlagSet(DOWNLOADED))
         setFlag(ONLY_INFO);
 
+    /*xmldoc.close();
+    if( xmldoc.open(QFile::WriteOnly) )
+    {
+        QTextStream stream(&xmldoc);
+        stream.setCodec("UTF-8");
+        stream << doc.toString();
+    }*/
     return true;
+}
+
+
+void appinfo_t::delayedSetIcon()
+{
+#if defined(QT_DEBUG)
+    QFileIconProvider iconprovider;
+#endif
+    if(!QFile::exists(registry_info.icon))
+        return;
+    QPixmap pixmap;
+    if( pixmap.load(registry_info.icon) )
+        app_icon = QIcon(pixmap);
+    else
+        app_icon = iconprovider.icon(QFileInfo(registry_info.icon));
+
+    emit infoUpdated(this,false);
+}
+
+void appinfo_t::setRegistryInfo(registry_group_t *reg_group)
+{
+    registry_info.path = reg_group->group_base+"\\"+reg_group->group_name;
+
+    qDebug("%s: %s",Name.toAscii().data(),registry_info.path.toAscii().data());
+
+    registry_info.icon              = reg_group->getValue("DisplayIcon").beforeLast(",");
+    registry_info.silent_uninstall  = reg_group->getValue("QuietUninstallString");
+    registry_info.uninstall         = reg_group->getValue("UninstallString");
+    registry_info.version           = reg_group->getValue("DisplayVersion");
+    registry_info.displayName	    = reg_group->displayed_name;
+    if(registry_info.seachValue.isEmpty())
+        registry_info.seachValue    = reg_group->displayed_name.toUpper();
+
+    if(registry_info.version.isEmpty() && registry_info.version_path=="DISPLAYNAME")
+    {
+        registry_info.version = registry_info.displayName;
+    }
+
+    if(!registry_info.version_path.isEmpty() && registry_info.version_path!="DISPLAYNAME")
+    {
+        QSettings values(registry_info.version_path.beforeLast('\\'),QSettings::NativeFormat);
+        registry_info.version        = values.value(registry_info.version_path.afterLast('\\')).toString();
+    }
+
+    if(registry_info.icon.isEmpty() && registry_info.version.isEmpty()
+       && registry_info.uninstall.isEmpty() && registry_info.silent_uninstall.isEmpty() )
+    {
+        qDebug("no version,icon,uninstall,silentuninstall found");
+        return;
+    }
+
+    QString regexString = registry_info.regex;
+    QRegExp regex(regexString);
+    registry_info.version = registry_info.version.replace(regex,registry_info.regexReplace);
+
+    QTimer::singleShot((qrand()%30+5)*1000,this,SLOT(delayedSetIcon()));
+    setFlag(INSTALLED);
+    if( newerVersionAvailable() )
+        setFlag(UPDATE_AVAIL);
+    else
+        unSetFlag(UPDATE_AVAIL);
+
+    unSetFlag(ONLY_INFO);
 }
 
 bool appinfo_t::ParseRegistryInfo()
@@ -612,43 +758,43 @@ bool appinfo_t::ParseRegistryInfo()
     QString path;
     if( QSysInfo::WordSize == 64 )
     {
-        regBase <<  tr("HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\");
-        regBase <<  tr("HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\");
+        regBase <<  "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\";
+        regBase <<  "HKEY_LOCAL_MACHINE\\SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\";
     }
-    regBase <<  tr("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\");
-    regBase <<  tr("HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\");
+    regBase <<  "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\";
+    regBase <<  "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\";
 
-    if( registry_info.search_term.isEmpty() && registry_info.version.isEmpty() )
+    qDebug("search registry for: %s",registry_info.seachValue.toAscii().data());
+
+    if( registry_info.seachValue.isEmpty() && registry_info.version.isEmpty() )
         return false;
 
-    if(registry_info.search_term.startsWith(tr("HKEY_CURRENT_USER")) || registry_info.search_term.startsWith(tr("HKEY_LOCAL_MACHINE")))
+    if(registry_info.seachValue.startsWith("HKEY_CURRENT_USER") || registry_info.seachValue.startsWith("HKEY_LOCAL_MACHINE"))
     {
-        path = registry_info.search_term;
+        path = registry_info.seachValue;
         goto next;
     }
 
     for(int a=0;a<regBase.count();a++)
     {
-        QApplication::processEvents();
         QSettings Registry(regBase[a], QSettings::NativeFormat);
         QStringList childkeys;
 
-        QSettings settings(registry_info.search_term.beforeLast('\\'), QSettings::NativeFormat);
+        QSettings settings(registry_info.seachValue.beforeLast('\\'), QSettings::NativeFormat);
 
-        if( settings.contains( registry_info.search_term.afterLast('\\')) )
+        if( settings.contains( registry_info.seachValue.afterLast('\\')) )
             goto next;
 
-        if( Registry.contains( registry_info.search_term ) )
+        if( Registry.contains( registry_info.seachValue ) )
         {
-            path = regBase[a] + registry_info.search_term;
+            path = regBase[a] + registry_info.seachValue;
             goto next;
         }
 
         childkeys = Registry.childGroups();
         for(int i=0;i<childkeys.count();i++)
         {
-            QApplication::processEvents();
-            if( childkeys.at(i).contains(registry_info.search_term) )
+            if( childkeys.at(i).toUpper().contains(registry_info.seachValue) )
             {
                 path = regBase[a] + childkeys[i];
                 goto next;
@@ -657,8 +803,7 @@ bool appinfo_t::ParseRegistryInfo()
             QStringList valuekeys = valuesettings.childKeys();
             for(int j=0;j<valuekeys.count();j++)
             {
-                QApplication::processEvents();
-                if( valuesettings.value( valuekeys.at(j) ).toString().contains(registry_info.search_term) )
+                if( valuesettings.value( valuekeys.at(j) ).toString().toUpper().contains(registry_info.seachValue) )
                 {
                     path = regBase[a] + childkeys[i];
                     goto next;
@@ -666,61 +811,75 @@ bool appinfo_t::ParseRegistryInfo()
             }
         }
 
-        if( !registry_info.version.isEmpty() )
+        if( !registry_info.version_path.isEmpty() )
         {
-            QSettings settings2(registry_info.version.beforeLast('\\'), QSettings::NativeFormat);
-            QString version = settings2.value(registry_info.version.afterLast('\\')).toString();
+            QSettings settings2(registry_info.version_path.beforeLast('\\'), QSettings::NativeFormat);
+            QString version = settings2.value(registry_info.version_path.afterLast('\\')).toString();
 
-             if( !version.isEmpty())
-             {
+            if( !version.isEmpty())
+            {
+                QString regexString = registry_info.regex;
+                QRegExp regex(regexString);
+                version = version.replace(regex,registry_info.regexReplace);
                 registry_info.version = version;
+
+                setFlag(INSTALLED);
+                if( newerVersionAvailable() )
+                    setFlag(UPDATE_AVAIL);
+                else
+                    unSetFlag(UPDATE_AVAIL);
+
+                unSetFlag(ONLY_INFO);
                 return true;
-             }
+            }
         }
     }
 
     return false;
 
-    next:
-    path.replace(tr("/"),tr("\\"));
+next:
+    path.replace("/","\\");
+    qDebug("registry found: %s",path.toAscii().data());
     registry_info.path = path;
     QSettings values(path,QSettings::NativeFormat);
 
-    registry_info.icon              = values.value(tr("DisplayIcon")).toString().remove(tr(",0"));
-    registry_info.silent_uninstall  = values.value(tr("QuietUninstallString")).toString();
-    registry_info.uninstall         = values.value(tr("UninstallString")).toString();
-    registry_info.version           = values.value(tr("DisplayVersion")).toString();
+    registry_info.icon              = values.value("DisplayIcon").toString().remove(",0");
+    registry_info.silent_uninstall  = values.value("QuietUninstallString").toString();
+    registry_info.uninstall         = values.value("UninstallString").toString();
+    registry_info.version           = values.value("DisplayVersion").toString();
+    registry_info.displayName	    = values.value("DisplayName").toString();
 
-    if(!registry_info.version_path.isEmpty())
+    if(registry_info.version.isEmpty() && registry_info.version_path=="DisplayName")
+    {
+        registry_info.version = registry_info.displayName;
+    }
+
+    if(!registry_info.version_path.isEmpty() && registry_info.version_path!="DisplayName")
     {
         QSettings values(registry_info.version_path.beforeLast('\\'),QSettings::NativeFormat);
         registry_info.version        = values.value(registry_info.version_path.afterLast('\\')).toString();
     }
-    if(!registry_info.icon_path.isEmpty())
-    {
-        QSettings values(registry_info.icon_path.beforeLast('\\'),QSettings::NativeFormat);
-        registry_info.icon        = values.value(registry_info.icon_path.afterLast('\\')).toString();
-    }
-    if(!registry_info.uninstall_path.isEmpty())
-    {
-        QSettings values(registry_info.uninstall_path.beforeLast('\\'),QSettings::NativeFormat);
-        registry_info.uninstall        = values.value(registry_info.uninstall_path.afterLast('\\')).toString();
-    }
-    if(!registry_info.silent_uninstall_path.isEmpty())
-    {
-        QSettings values(registry_info.silent_uninstall_path.beforeLast('\\'),QSettings::NativeFormat);
-        registry_info.silent_uninstall = values.value(registry_info.silent_uninstall_path.afterLast('\\')).toString();
-    }
 
     if(registry_info.icon.isEmpty() && registry_info.version.isEmpty()
-            && registry_info.uninstall.isEmpty() && registry_info.silent_uninstall.isEmpty() )
+       && registry_info.uninstall.isEmpty() && registry_info.silent_uninstall.isEmpty() )
         return false;
 
-    QPixmap pixmap;
-    if( pixmap.load(registry_info.icon) )
-        app_icon = QIcon(pixmap);
+    QString regexString = registry_info.regex;
+    QRegExp regex(regexString);
+    registry_info.version = registry_info.version.replace(regex,registry_info.regexReplace);
+
+#if defined(QT_DEBUG)
+    QFileIconProvider iconprovider;
+#endif
+
+    QTimer::singleShot((qrand()%30+5)*1000,this,SLOT(delayedSetIcon()));
+    setFlag(INSTALLED);
+    if( newerVersionAvailable() )
+        setFlag(UPDATE_AVAIL);
     else
-        app_icon = iconprovider.icon(QFileInfo(registry_info.icon));
+        unSetFlag(UPDATE_AVAIL);
+
+    unSetFlag(ONLY_INFO);
     return true;
 }
 

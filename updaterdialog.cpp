@@ -33,28 +33,24 @@ UpdaterDialog::UpdaterDialog(QList<applist_t::fileinfo_t> &list,enum download_ty
         for(int i=0;i<list.count();i++)
         {
             qDebug("%d",i);
-            list[i].info->updateVersion(&qnam);
+	    list[i].info->updateVersion(&qnam);
         }
     }else
     {
         QDir dir;
-        if( !dir.exists(tr("Info")) && !dir.mkdir(tr("Info")) )
+        if( !dir.exists("Info") && !dir.mkdir("Info") )
         {
-            QMessageBox::warning(this,tr("WinApp_Manager error"),
-                                 tr("failed to create subdir \"Info\""));
+            QMessageBox::warning(this,"WinApp_Manager error",
+                                 "failed to create subdir \"Info\"");
             QTimer::singleShot(1000,this,SLOT(close()));
             return;
         }
-        ui->label->setText(tr("fetching application list..."));
+        ui->label->setText("fetching application list...");
 
         QNetworkReply *reply;
         QString url;
 
-        url = tr("http://appdriverupdate.sourceforge.net/Files/TreeInfo.xml");
-        reply = qnam.get(QNetworkRequest(url));
-        connect(reply,SIGNAL(finished()),SLOT(onCategoryTreeDownloaded()));
-
-        url = tr("http://appdriverupdate.sourceforge.net/Files/PkgList.xml");
+        url = "http://appdriverupdate.sourceforge.net/Apps/Files/PkgList.xml";
         reply = qnam.get(QNetworkRequest(url));
         connect(reply,SIGNAL(downloadProgress(qint64,qint64)),SLOT(onProgress(qint64,qint64)));
         connect(reply,SIGNAL(finished()),SLOT(onAppListDownloaded()));
@@ -66,7 +62,6 @@ UpdaterDialog::~UpdaterDialog()
     delete ui;
 }
 
-
 void UpdaterDialog::onProgress(qint64 recv,qint64 tot)
 {
     ui->progressBar->setRange(0,tot);
@@ -75,7 +70,6 @@ void UpdaterDialog::onProgress(qint64 recv,qint64 tot)
 
 void UpdaterDialog::onCategoryTreeDownloaded()
 {
-    m_count++;
     QNetworkReply *reply = (QNetworkReply*)sender();
     QString html = reply->readAll();
     if(html.isEmpty())
@@ -84,11 +78,12 @@ void UpdaterDialog::onCategoryTreeDownloaded()
         return;
     }
 
-    QFile file(tr("Info/TreeInfo.xml"));
+    QFile file("Info/TreeInfo.xml");
     if( !file.open(QFile::WriteOnly) )
         qDebug("failed to open file TreeInfo.xml");
 
     file.write(html.toAscii());
+    file.close();
 }
 
 void UpdaterDialog::onAppListDownloaded()
@@ -112,8 +107,8 @@ void UpdaterDialog::onAppListDownloaded()
     while( !node.isNull() )
     {
         applist_t::fileinfo_t new_fileinfo;
-        new_fileinfo.name = node.attribute(tr("name"));
-        new_fileinfo.lastUpdate = node.attribute(tr("LastUpdate"));
+        new_fileinfo.name = node.attribute("name");
+        new_fileinfo.lastUpdate = node.attribute("LastUpdate");
         int index = m_list.indexOf(new_fileinfo);
         if( index != -1 )
         {
@@ -130,11 +125,12 @@ void UpdaterDialog::onAppListDownloaded()
         node = node.nextSiblingElement();
     }
 
-    m_count = m_max = dlAppinfo.count();
+    m_count = m_max = dlAppinfo.count()+1;
+    qDebug("downloading %d files",m_count);
 
     if( m_type == update_check_appinfo )
     {
-        done(m_max>0);
+        done(m_max>1);
         return;
     }
 
@@ -142,10 +138,14 @@ void UpdaterDialog::onAppListDownloaded()
     ui->label->setText(tr("updating info %1/%2").arg(m_max-m_count).arg(m_max));
     connect(&qnam, SIGNAL(finished(QNetworkReply*)),SLOT(ondownloadFinished(QNetworkReply*)));
 
+    QString url;
+    url = "http://appdriverupdate.sourceforge.net/Apps/Files/TreeInfo.xml";
+    reply = qnam.get(QNetworkRequest(url));
+    connect(reply,SIGNAL(finished()),SLOT(onCategoryTreeDownloaded()));
+
     for(int i=0;i<dlAppinfo.count();i++)
     {
-        QString url = tr("http://appdriverupdate.sourceforge.net/Files/")+dlAppinfo[i].name+tr(".xml");
-        QNetworkReply *reply;
+        url = "http://appdriverupdate.sourceforge.net/Apps/Files/"+dlAppinfo[i].name+".xml";
         reply = qnam.get(QNetworkRequest(url));
         connect(reply,SIGNAL(finished()),SLOT(onNewFileInfo()));
     }
@@ -169,10 +169,10 @@ void UpdaterDialog::onNewFileInfo()
         return;
     }
 
-    QFile file(tr("Info/")+reply->url().toString().afterLast('/'));
+    QFile file("Info/"+reply->url().toString().afterLast('/'));
     if( !file.open(QFile::WriteOnly) )
     {
-        qDebug(tr("unable to open file %1").arg(tr("Info/")+reply->url().toString().afterLast('/')).toAscii());
+        qDebug(tr("unable to open file %1").arg("Info/"+reply->url().toString().afterLast('/')).toAscii());
         return;
     }
     file.write(html.toAscii());
@@ -186,7 +186,7 @@ void UpdaterDialog::onNewFileInfo()
         return;
     }
 
-    f.name = doc.documentElement().attribute(tr("NAME"));
+    f.name = doc.documentElement().attribute("NAME");
     qDebug(tr("got name:%2").arg(f.name).toAscii());
 
     int index = dlAppinfo.indexOf(f);

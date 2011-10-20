@@ -12,7 +12,7 @@ ChooseDialog::ChooseDialog(appinfo_t *info,QWidget *parent) :
     ui->setupUi(this);
     ui->checkInstall->setChecked(true);
     m_info = info;
-    this->setWindowTitle(tr("Select: ")+m_info->Name);
+    this->setWindowTitle("Select: "+m_info->Name);
 
     if( info->isFlagSet(appinfo_t::ONLY_SILENT) )
     {

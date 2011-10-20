@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
+#include <QTimer>
 #include "applist_t.h"
 
 namespace Ui {

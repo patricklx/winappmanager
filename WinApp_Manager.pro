@@ -20,7 +20,9 @@ SOURCES += main.cpp\
     updaterdialog.cpp \
     task_t.cpp \
     tasklist_t.cpp \
-    applist_t.cpp
+    applist_t.cpp \
+    appinfo_registry_t.cpp \
+    eventsink.cpp
 
 HEADERS  += mainwindow.h \
     appinfo_t.h \
@@ -29,7 +31,9 @@ HEADERS  += mainwindow.h \
     updaterdialog.h \
     task_t.h \
     tasklist_t.h \
-    applist_t.h
+    applist_t.h \
+    appinfo_registry_t.h \
+    eventsink.h
 
 FORMS    += mainwindow.ui \
     settingsdialog.ui \
@@ -37,7 +41,6 @@ FORMS    += mainwindow.ui \
     updaterdialog.ui \
     applist_t.ui \
     tasklist_t.ui
-
 
 RESOURCES += \
     resource.qrc
@@ -47,9 +50,20 @@ RESOURCES += \
     CONFIG(release, debug|release)    {
         message (release build)
        CONFIG += static
-       QTPLUGIN += qico
+	LIBS += -L$$[QT_INSTALL_PLUGINS]/imageformats -lqico
        QMAKE_LFLAGS += -static-libgcc
     }
 
 OTHER_FILES += \
-    appico.rc
+    appico.rc \
+    cvs/New Text Document.txt \
+    cvs/New Text Document.txt
+
+QMAKE_CFLAGS_RELEASE= -O3
+QMAKE_CXXFLAGS_RELEASE = -O3
+QMAKE_CXXFLAGS += -Wuninitialized
+
+LIBS += -lshlwapi
+
+
+

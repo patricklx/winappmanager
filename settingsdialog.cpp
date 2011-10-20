@@ -3,6 +3,7 @@
 #include <QMessageBox>
 #include <QDir>
 #include <QNetworkProxy>
+#include <QDesktopWidget>
 #include "settingsdialog.h"
 #include "ui_settingsdialog.h"
 
@@ -15,10 +16,14 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    move(SettingsDialog::screenCenter()-rect().bottomRight()/2);
+
     ui->checklatestversion->setChecked(shouldCheckVersions());
     ui->checkupdates->setChecked(shouldCheckAppInfo());
     ui->checkstartwithsystem->setChecked(startsWithSystem());
     ui->maxtaskCount->setValue(simulDownloadCount());
+    ui->ckShowAllApps->setChecked(showAllApps());
+    ui->ckdlPackage->setChecked(isSetDownloadPackages());
 
     switch(getInstallMode())
     {
@@ -71,7 +76,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     if(proxyEnabled())
         ui->proxy_settings->setChecked(true);
 
-    switch(settings->value(tr("PROXY_TYPE")).toInt())
+    switch(settings->value("PROXY_TYPE").toInt())
     {
     case QNetworkProxy::Socks5Proxy:
         ui->proxy_type->setCurrentIndex(0);
@@ -87,10 +92,10 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
         break;
     }
 
-    ui->proxy_hostname->setText( settings->value(tr("PROXY_HOSTNAME")).toString() );
-    ui->proxy_username->setText( settings->value(tr("PROXY_USERNAME")).toString() );
-    ui->proxy_port->setText( settings->value(tr("PROXY_PORT")).toString() );
-    ui->proxy_password->setText( settings->value(tr("PROXY_PASSWORD")).toString());
+    ui->proxy_hostname->setText( settings->value("PROXY_HOSTNAME").toString() );
+    ui->proxy_username->setText( settings->value("PROXY_USERNAME").toString() );
+    ui->proxy_port->setText( settings->value("PROXY_PORT").toString() );
+    ui->proxy_password->setText( settings->value("PROXY_PASSWORD").toString());
 }
 
 SettingsDialog::~SettingsDialog()
@@ -101,89 +106,113 @@ SettingsDialog::~SettingsDialog()
 
 void SettingsDialog::on_btApply_clicked()
 {
-    settings->setValue(tr("CHECK_VERSIONS"),ui->checklatestversion->isChecked());
-    settings->setValue(tr("CHECK_INFO"),ui->checkupdates->isChecked());
-    settings->setValue(tr("DOWNLOAD_COUNT"),ui->maxtaskCount->value());
+    settings->setValue("CHECK_VERSIONS",ui->checklatestversion->isChecked());
+    settings->setValue("CHECK_INFO",ui->checkupdates->isChecked());
+    settings->setValue("DOWNLOAD_COUNT",ui->maxtaskCount->value());
+    settings->setValue("SHOW_ALL_APPS",ui->ckShowAllApps->isChecked());
+    settings->setValue("DL_PACKAGES",ui->ckdlPackage->isChecked());
 
     if( !setStartWithSystem(ui->checkstartwithsystem->isChecked()) )
     {
-        QMessageBox::information(this,tr("Setting Start With System"),tr("Failed to add/remove Winapp_manager to/from the startup!\n retry as admin"));
+        QMessageBox::information(this,"Setting Start With System","Failed to add/remove Winapp_manager to/from the startup!\n retry as admin");
     }
 
 
     if( ui->checkAskInstall->isChecked() )
-        settings->setValue(tr("INSTALL_MODE"),ASK);
+        settings->setValue("INSTALL_MODE",ASK);
     if( ui->checkAttendeInstall->isChecked() )
-        settings->setValue(tr("INSTALL_MODE"),ATTENDED);
+        settings->setValue("INSTALL_MODE",ATTENDED);
     if( ui->checkSilentInstall->isChecked() )
-        settings->setValue(tr("INSTALL_MODE"),SILENT);
+        settings->setValue("INSTALL_MODE",SILENT);
 
     if( ui->checkUpgradeAsk->isChecked() )
-        settings->setValue(tr("UPGRADE_MODE"),ASK);
+        settings->setValue("UPGRADE_MODE",ASK);
     if( ui->checkAttendedUpgrade->isChecked() )
-        settings->setValue(tr("UPGRADE_MODE"),ATTENDED);
+        settings->setValue("UPGRADE_MODE",ATTENDED);
     if( ui->checkSilentUpgrade->isChecked() )
-        settings->setValue(tr("UPGRADE_MODE"),SILENT);
+        settings->setValue("UPGRADE_MODE",SILENT);
 
     if( ui->checkAskClose->isChecked() )
-        settings->setValue(tr("CLOSE_MODE"),ASK);
+        settings->setValue("CLOSE_MODE",ASK);
     if( ui->checkCloseClsoe->isChecked() )
-        settings->setValue(tr("CLOSE_MODE"),CLOSE);
+        settings->setValue("CLOSE_MODE",CLOSE);
     if( ui->checkCloseMinimize->isChecked() )
-        settings->setValue(tr("CLOSE_MODE"),MINIMIZE);
+        settings->setValue("CLOSE_MODE",MINIMIZE);
 
     if( ui->installmodeAttended->isChecked() )
-        settings->setValue(tr("INSTALL_TASK_MODE"),ATTENDED);
+        settings->setValue("INSTALL_TASK_MODE",ATTENDED);
     if( ui->installModeSilent->isChecked() )
-        settings->setValue(tr("INSTALL_TASK_MODE"),SILENT);
+        settings->setValue("INSTALL_TASK_MODE",SILENT);
 
     if( ui->proxy_settings->isChecked() )
     {
-        settings->setValue(tr("PROXY_ENABLED"),true);
+        settings->setValue("PROXY_ENABLED",true);
         QString value;
         value = ui->proxy_hostname->text();
-        settings->setValue(tr("PROXY_HOSTNAME"),value);
+        settings->setValue("PROXY_HOSTNAME",value);
 
         value = ui->proxy_password->text();
-        settings->setValue(tr("PROXY_PASSWORD"),value);
+        settings->setValue("PROXY_PASSWORD",value);
 
         value = ui->proxy_port->text();
-        settings->setValue(tr("PROXY_PORT"),value);
+        settings->setValue("PROXY_PORT",value);
 
         value = ui->proxy_type->currentText();
-        if(value == tr("Socks5Proxy"))
-            settings->setValue(tr("PROXY_TYPE"),QNetworkProxy::Socks5Proxy);
-        if( value == tr("HttpProxy"))
-            settings->setValue(tr("PROXY_TYPE"),QNetworkProxy::HttpProxy);
-        if( value == tr("HttpCachingProxy") )
-            settings->setValue(tr("PROXY_TYPE"),QNetworkProxy::HttpCachingProxy);
-        if( value == tr("FtpCachingProxy") )
-            settings->setValue(tr("PROXY_TYPE"),QNetworkProxy::FtpCachingProxy);
+        if(value == "Socks5Proxy")
+            settings->setValue("PROXY_TYPE",QNetworkProxy::Socks5Proxy);
+        if( value == "HttpProxy")
+            settings->setValue("PROXY_TYPE",QNetworkProxy::HttpProxy);
+        if( value == "HttpCachingProxy" )
+            settings->setValue("PROXY_TYPE",QNetworkProxy::HttpCachingProxy);
+        if( value == "FtpCachingProxy" )
+            settings->setValue("PROXY_TYPE",QNetworkProxy::FtpCachingProxy);
 
         value = ui->proxy_username->text();
-        settings->setValue(tr("PROXY_USERNAME"),value);
+        settings->setValue("PROXY_USERNAME",value);
         setNetworkProxy();
     }else
-        settings->setValue(tr("PROXY_ENABLED"),false);
+        settings->setValue("PROXY_ENABLED",false);
 
     saveSettings();
     close();
 }
 
+
+bool SettingsDialog::showAllApps()
+{
+    return settings->value("SHOW_ALL_APPS","true").toBool();
+}
+
 bool SettingsDialog::proxyEnabled()
 {
-    return settings->value(tr("PROXY_ENABLED")).toBool();
+    return settings->value("PROXY_ENABLED",false).toBool();
+}
+
+bool SettingsDialog::isSetDownloadPackages()
+{
+    return settings->value("DL_PACKAGES",true).toBool();
 }
 
 QNetworkProxy SettingsDialog::getProxySettings()
 {
     QNetworkProxy proxy;
-    proxy.setType((QNetworkProxy::ProxyType)settings->value(tr("PROXY_TYPE")).toInt());
-    proxy.setHostName(settings->value(tr("PROXY_HOSTNAME")).toString());
-    proxy.setUser(settings->value(tr("PROXY_USERNAME")).toString());
-    proxy.setPassword(settings->value(tr("PROXY_PASSWORD")).toString());
-    proxy.setPort(settings->value(tr("PROXY_PORT")).toInt());
+    proxy.setType((QNetworkProxy::ProxyType)settings->value("PROXY_TYPE").toInt());
+    proxy.setHostName(settings->value("PROXY_HOSTNAME").toString());
+    proxy.setUser(settings->value("PROXY_USERNAME").toString());
+    proxy.setPassword(settings->value("PROXY_PASSWORD").toString());
+    proxy.setPort(settings->value("PROXY_PORT").toInt());
     return proxy;
+}
+
+bool SettingsDialog::updatedToLatestVersion()
+{
+    return (settings->value("latestVersion","1.0").toString() == "2.0");
+}
+
+
+void SettingsDialog::setUpdatedToLatestVersion()
+{
+    settings->setValue("latestVersion","2.0");
 }
 
 void SettingsDialog::loadSettings()
@@ -223,12 +252,12 @@ bool SettingsDialog::setStartWithSystem(bool start_with_system)
     QSettings registry("HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\", QSettings::NativeFormat);
     if(start_with_system==true)
     {
-        QString path = QDir::currentPath()+tr("/WinApp_Manager.exe");
-        path = tr("\"")+path.replace('/','\\')+tr("\" hidden");
-        registry.setValue(tr("WinApp_Manager"),path);
+        QString path = QDir::currentPath()+"/WinApp_Manager.exe";
+        path = "\""+path.replace('/','\\')+"\" hidden";
+        registry.setValue("WinApp_Manager",path);
     }
     else
-        registry.remove(tr("WinApp_Manager"));
+        registry.remove("WinApp_Manager");
 
     if(registry.status() != QSettings::NoError)
         return false;
@@ -238,7 +267,7 @@ bool SettingsDialog::setStartWithSystem(bool start_with_system)
 bool SettingsDialog::startsWithSystem()
 {
     QSettings registry("HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\", QSettings::NativeFormat);
-    if( registry.contains(tr("WinApp_Manager")) )
+    if( registry.contains("WinApp_Manager") )
     {
         return true;
     }else
@@ -256,45 +285,56 @@ QDate SettingsDialog::lastInfoUpdate()
 
 void SettingsDialog::setLastInfoUpdate(QDate date)
 {
-    settings->setValue(tr("LAST_INFO_CHECK"),date);
+    settings->setValue("LAST_INFO_CHECK",date);
 }
 
 QDate SettingsDialog::lastVersionUpdate()
 {
-    return settings->value(tr("LAST_VERSION_CHECK"),0).toDate();
+    return settings->value("LAST_VERSION_CHECK",0).toDate();
 }
 
 void SettingsDialog::setLastVersionUpdate(QDate date)
 {
-    settings->setValue(tr("LAST_VERSION_CHECK"),date);
+    settings->setValue("LAST_VERSION_CHECK",date);
 }
 
 int SettingsDialog::getInstallMode()
 {
-    return settings->value(tr("INSTALL_MODE")).toInt();
+    return settings->value("INSTALL_MODE").toInt();
 }
 
 int SettingsDialog::getUpgradeMode()
 {
-    return settings->value(tr("UPGRADE_MODE")).toInt();
+    return settings->value("UPGRADE_MODE").toInt();
 }
 
 int SettingsDialog::getCloseMode()
 {
-    return settings->value(tr("CLOSE_MODE")).toInt();
+    return settings->value("CLOSE_MODE").toInt();
 }
 
 int SettingsDialog::getInstallTaskMode()
 {
-    return settings->value(tr("INSTALL_TASK_MODE"),SILENT).toInt();
+    return settings->value("INSTALL_TASK_MODE",SILENT).toInt();
 }
 
 bool SettingsDialog::shouldCheckVersions()
 {
-    return settings->value(tr("CHECK_VERSIONS"),true).toBool();
+    return settings->value("CHECK_VERSIONS",true).toBool();
 }
 
 bool SettingsDialog::shouldCheckAppInfo()
 {
-    return settings->value(tr("CHECK_INFO"),true).toBool();
+    return settings->value("CHECK_INFO",true).toBool();
 }
+
+QPoint SettingsDialog::screenCenter()
+{
+    QPoint pos = QCursor::pos();
+    int desktop = QApplication::desktop()->screenNumber(pos);
+    QDesktopWidget *monitor = QApplication::desktop();
+    pos = monitor->availableGeometry(desktop).center();
+    return pos;
+}
+
+

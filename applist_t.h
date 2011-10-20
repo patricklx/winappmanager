@@ -25,8 +25,12 @@ public:
         QString name;
         appinfo_t *info;
 
-        bool operator ==(struct fileinfo_t a){
+        bool operator ==(struct fileinfo_t a) const{
             return (a.name == name);
+        }
+
+        bool operator <( struct fileinfo_t a) const{
+            return (a.name < name);
         }
         fileinfo_t():info(NULL){}
     }fileinfo_t;
@@ -38,6 +42,7 @@ signals:
     void taskChosen(task_t *task);
     void unSelected(appinfo_t *info);
     void versions_available();
+    void status(QString text);
 
 private slots:
     void on_TCategoryTree_itemSelectionChanged();
@@ -54,6 +59,7 @@ private slots:
 
     void on_lbSearch_textChanged(const QString &arg1);
     bool loadList();
+    void setRegistryInfo(registry_group_t group);
 
 public slots:
     void onRemovedFromTasks(appinfo_t *info);
@@ -64,6 +70,7 @@ public slots:
 private:
     Ui::applist_t *ui;
     QList<fileinfo_t> fileinfo_list;
+    QList<fileinfo_t> noinfo_list;
     bool info_updates_avail;
     void appendToList(fileinfo_t &fileinfo);
     void saveList();

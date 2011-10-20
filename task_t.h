@@ -19,11 +19,11 @@ public:
     };
 
     task_t(appinfo_t *appinfo, int flags);
-    task_t(appinfo_t *appinfo,appinfo_t::inet_file_t inet_file,int flags);
+    task_t(appinfo_t *appinfo,appinfo_t::file_info_t inet_file,int flags);
     task_t():QThread(),m_appinfo(NULL),should_quit(false){}
     ~task_t(){qDebug("deleted task");}
 
-    appinfo_t::inet_file_t m_inet_file;
+    appinfo_t::file_info_t m_inet_file;
 
     int m_flags;
     int m_current_task;
@@ -47,9 +47,12 @@ private:
     bool download();
     bool install();
     bool uninstall();
+    bool setRunAsAdmin(QString path);
+    void unSetRunAsAdmin(QString path);
+    bool followProcessChilds(int id);
+
 signals:
     void progress(task_t *t,int p, QString info);
-    void finish_success();
 };
 
 #endif // TASK_T_H

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>440</width>
-    <height>293</height>
+    <width>368</width>
+    <height>349</height>
    </rect>
   </property>
   <property name="palette">
@@ -111,16 +111,35 @@
         </widget>
        </item>
        <item>
-        <widget class="QCheckBox" name="checkupdates">
+        <widget class="QCheckBox" name="checkstartwithsystem">
          <property name="text">
-          <string>Check for info updates on program start</string>
+          <string>Start with System</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QCheckBox" name="checkstartwithsystem">
+        <widget class="QGroupBox" name="checkupdates">
+         <property name="title">
+          <string>Check for package updates on program start</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_8">
+          <item>
+           <widget class="QCheckBox" name="ckdlPackage">
+            <property name="text">
+             <string>also download new and updated packages</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="ckShowAllApps">
          <property name="text">
-          <string>Start with System</string>
+          <string>show all installed applications</string>
          </property>
         </widget>
        </item>
@@ -492,6 +511,33 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>tabWidget</tabstop>
+  <tabstop>checklatestversion</tabstop>
+  <tabstop>checkstartwithsystem</tabstop>
+  <tabstop>ckShowAllApps</tabstop>
+  <tabstop>checkUpgradeAsk</tabstop>
+  <tabstop>checkSilentUpgrade</tabstop>
+  <tabstop>checkAttendedUpgrade</tabstop>
+  <tabstop>checkAskInstall</tabstop>
+  <tabstop>checkSilentInstall</tabstop>
+  <tabstop>checkAttendeInstall</tabstop>
+  <tabstop>checkAskClose</tabstop>
+  <tabstop>checkCloseClsoe</tabstop>
+  <tabstop>checkCloseMinimize</tabstop>
+  <tabstop>maxtaskCount</tabstop>
+  <tabstop>installmodeAttended</tabstop>
+  <tabstop>installModeSilent</tabstop>
+  <tabstop>proxy_settings</tabstop>
+  <tabstop>proxy_hostname</tabstop>
+  <tabstop>proxy_port</tabstop>
+  <tabstop>proxy_username</tabstop>
+  <tabstop>proxy_password</tabstop>
+  <tabstop>proxy_type</tabstop>
+  <tabstop>btApply</tabstop>
+  <tabstop>btCancel</tabstop>
+  <tabstop>ckdlPackage</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

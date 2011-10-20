@@ -38,6 +38,12 @@ private slots:
     void onTrayDoubleClicked(QSystemTrayIcon::ActivationReason reason = QSystemTrayIcon::DoubleClick);
     void newVersionMessage();
     void resetTaskBarIcon();
+
+public slots:
+    void show();
+    void trayContextMenuFix();
+    void setStatus(QString text);
+
 };
 
 #endif // MAINWINDOW_H

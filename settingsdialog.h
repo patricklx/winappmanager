@@ -53,6 +53,15 @@ public:
     static void loadSettings();
     static void unLoadSettings();
 
+    static bool showAllApps();
+
+    static QPoint screenCenter();
+
+    static bool isSetDownloadPackages();
+
+    static bool updatedToLatestVersion();
+    static void setUpdatedToLatestVersion();
+
 private slots:
     void on_btApply_clicked();
 

@@ -298,9 +298,6 @@
       <property name="uniformRowHeights">
        <bool>true</bool>
       </property>
-      <property name="columnCount">
-       <number>1</number>
-      </property>
       <attribute name="headerVisible">
        <bool>false</bool>
       </attribute>
@@ -368,8 +365,11 @@
        <property name="sortingEnabled">
         <bool>true</bool>
        </property>
-       <attribute name="headerCascadingSectionResizes">
-        <bool>false</bool>
+       <property name="columnCount">
+        <number>5</number>
+       </property>
+       <attribute name="headerDefaultSectionSize">
+        <number>100</number>
        </attribute>
        <column>
         <property name="text">
@@ -381,7 +381,7 @@
          <string>I./D. Version</string>
         </property>
         <property name="toolTip">
-         <string>Installed/Downloaded Version</string>
+         <string>Installed or Downloaded Version</string>
         </property>
        </column>
        <column>
