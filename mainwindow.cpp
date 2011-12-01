@@ -21,7 +21,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->Page1Applist,SIGNAL(unSelected(appinfo_t*)),ui->Page2TaskList,SLOT(removeTask(appinfo_t*)));
     connect(ui->Page2TaskList,SIGNAL(onTaskRemoved(appinfo_t*)),ui->Page1Applist,SLOT(onRemovedFromTasks(appinfo_t*)));
     connect(ui->Page2TaskList,SIGNAL(updateAppInfo(appinfo_t*)),ui->Page1Applist,SLOT(updateItem(appinfo_t*)));
-    timer_update.setInterval(1000*60*60);//check every hour
+    timer_update.setInterval(1000*60*60*2);//check every 2 hour
     connect(&timer_update,SIGNAL(timeout()),SLOT(timerEvent()));
 
     trayicon = new QSystemTrayIcon(QIcon(":icons/WinApp_Manager.ico"),this);
@@ -173,4 +173,12 @@ void MainWindow::on_actionAbout_triggered()
 void MainWindow::on_actionAboutQt_triggered()
 {
     QMessageBox::aboutQt(this,"aboutQt");
+}
+
+void MainWindow::on_actionReload_triggered()
+{
+    if(ui->Page2TaskList->isEmpty())
+        ui->Page1Applist->loadList();
+    else
+        QMessageBox::information(this,"Unable to reload","Can't reload list while there are running or pending tasks!");
 }

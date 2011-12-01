@@ -33,7 +33,8 @@ UpdaterDialog::UpdaterDialog(QList<applist_t::fileinfo_t> &list,enum download_ty
         for(int i=0;i<list.count();i++)
         {
             qDebug("%d",i);
-	    list[i].info->updateVersion(&qnam);
+            QNetworkReply *reply = list[i].info->updateVersion(&qnam);
+            connections.append(reply);
         }
     }else
     {
@@ -52,9 +53,12 @@ UpdaterDialog::UpdaterDialog(QList<applist_t::fileinfo_t> &list,enum download_ty
 
         url = "http://appdriverupdate.sourceforge.net/Apps/Files/PkgList.xml";
         reply = qnam.get(QNetworkRequest(url));
+        connections.append(reply);
         connect(reply,SIGNAL(downloadProgress(qint64,qint64)),SLOT(onProgress(qint64,qint64)));
         connect(reply,SIGNAL(finished()),SLOT(onAppListDownloaded()));
     }
+    connect(&timeout,SIGNAL(timeout()),SLOT(on_btCancel_clicked()));
+    timeout.start(30000);
 }
 
 UpdaterDialog::~UpdaterDialog()
@@ -90,6 +94,7 @@ void UpdaterDialog::onAppListDownloaded()
 {
     qDebug("downloaded app list");
     QNetworkReply *reply = (QNetworkReply*)sender();
+    connections.removeOne(reply);
     reply->deleteLater();
     QString html = reply->readAll();
 
@@ -141,6 +146,7 @@ void UpdaterDialog::onAppListDownloaded()
     QString url;
     url = "http://appdriverupdate.sourceforge.net/Apps/Files/TreeInfo.xml";
     reply = qnam.get(QNetworkRequest(url));
+    connections.append(reply);
     connect(reply,SIGNAL(finished()),SLOT(onCategoryTreeDownloaded()));
 
     for(int i=0;i<dlAppinfo.count();i++)
@@ -200,6 +206,7 @@ void UpdaterDialog::onNewFileInfo()
 void UpdaterDialog::ondownloadFinished(QNetworkReply *reply)
 {
     m_count--;
+    connections.removeOne(reply);
     reply->deleteLater();
     ui->progressBar->setValue(m_max-m_count);
     if(m_type == update_version)
@@ -209,9 +216,16 @@ void UpdaterDialog::ondownloadFinished(QNetworkReply *reply)
 
     if(m_count<=0)
         QTimer::singleShot(1000,this,SLOT(accept()));
+
+    timeout.start();
 }
 
 void UpdaterDialog::on_btCancel_clicked()
 {
+    while(!connections.isEmpty())
+    {
+        QNetworkReply *reply = connections.takeFirst();
+        reply->abort();
+    }
     close();
 }

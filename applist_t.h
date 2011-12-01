@@ -58,7 +58,7 @@ private slots:
     void onSetAppInfoUpdated(QString name, QString lastUpdate);
 
     void on_lbSearch_textChanged(const QString &arg1);
-    bool loadList();
+
     void setRegistryInfo(registry_group_t group);
 
 public slots:
@@ -66,6 +66,7 @@ public slots:
     void updateItem(appinfo_t *appinfo);
     void onVersionUpdated(appinfo_t *appinfo,bool updated);
     void on_btUpdate_clicked();
+    bool loadList();
 
 private:
     Ui::applist_t *ui;

@@ -17,6 +17,7 @@ public:
     tasklist_t(QWidget *parent = 0);
     ~tasklist_t();
 
+    bool isEmpty();
 
 signals:
     void onTaskRemoved(appinfo_t *info);

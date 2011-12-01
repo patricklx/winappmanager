@@ -39,7 +39,9 @@ private slots:
     void newVersionMessage();
     void resetTaskBarIcon();
 
-public slots:
+    void on_actionReload_triggered();
+
+    public slots:
     void show();
     void trayContextMenuFix();
     void setStatus(QString text);

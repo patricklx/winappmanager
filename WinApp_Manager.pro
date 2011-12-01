@@ -21,8 +21,7 @@ SOURCES += main.cpp\
     task_t.cpp \
     tasklist_t.cpp \
     applist_t.cpp \
-    appinfo_registry_t.cpp \
-    eventsink.cpp
+    appinfo_registry_t.cpp
 
 HEADERS  += mainwindow.h \
     appinfo_t.h \
@@ -32,8 +31,7 @@ HEADERS  += mainwindow.h \
     task_t.h \
     tasklist_t.h \
     applist_t.h \
-    appinfo_registry_t.h \
-    eventsink.h
+    appinfo_registry_t.h
 
 FORMS    += mainwindow.ui \
     settingsdialog.ui \
@@ -64,6 +62,8 @@ QMAKE_CXXFLAGS_RELEASE = -O3
 QMAKE_CXXFLAGS += -Wuninitialized
 
 LIBS += -lshlwapi
+
+
 
 
 

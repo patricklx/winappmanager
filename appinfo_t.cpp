@@ -360,6 +360,8 @@ QString appinfo_t::getDownloadURL(file_info_t &inet_file)
 
             QString urlstr = regex.cap(1);
 
+            qDebug() << "regex captured: " << urlstr;
+
             QUrl url_resolve(urlstr);
             qDebug(urlstr.toAscii());
 

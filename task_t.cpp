@@ -135,6 +135,7 @@ bool task_t::followProcessChilds(int pid)
                     }
                     QString ProcessName = foundProcessName;
                     qDebug("found process: %d %s ",foundProcessPID,foundProcessName.toAscii().data());
+                    emit progress(this,-1,"waiting for process: "+ProcessName);
 
 
                     process_found = true;

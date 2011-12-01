@@ -36,6 +36,8 @@ private:
     Ui::UpdaterDialog *ui;
     QList<applist_t::fileinfo_t> &m_list;
     QList<applist_t::fileinfo_t> dlAppinfo;
+    QList<QNetworkReply*> connections;
+    QTimer timeout;
     int m_count;
     int m_max;
 

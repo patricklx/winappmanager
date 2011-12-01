@@ -67,6 +67,9 @@ void tasklist_t::removeTask(appinfo_t *info)
             break;
     }
 
+    if(t==NULL)
+        return;
+
     if(!t->isRunning())
     {
         installList.removeOne(t);
@@ -81,7 +84,9 @@ void tasklist_t::removeTask(appinfo_t *info)
         t->deleteLater();
         delete item;
     }else
+    {
         QMessageBox::information(this,"Removing Task","Can't remove: the task is currently running!");
+    }
 }
 
 void tasklist_t::addTask(task_t *task)
@@ -479,3 +484,8 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
 }
 
 
+
+bool tasklist_t::isEmpty()
+{
+    return ui->LTaskList->topLevelItemCount()==0;
+}

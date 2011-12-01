@@ -284,10 +284,12 @@ void applist_t::onVersionUpdated(appinfo_t *appinfo, bool updated)
 
 void applist_t::clear()
 {
+    ui->LAppInfoList->clear();
+    ui->TCategoryTree->clear();
     while( !fileinfo_list.isEmpty() )
     {
-        fileinfo_t fileinfo = fileinfo_list.at(0);
-        fileinfo_list.removeFirst();
+        fileinfo_t fileinfo = fileinfo_list.takeFirst();
+        emit unSelected(fileinfo.info);
         delete fileinfo.info;
     }
 }
@@ -375,6 +377,11 @@ bool applist_t::loadList()
 {
     QFile appinfolist_file("Info/PkgList.xml");
     bool listDownloaded = false;
+    clear();
+    ui->progressBar->show();
+    ui->progressBar->setValue(0);
+    //ui->lbLoad->show();
+    QApplication::processEvents();
 
     if( !appinfolist_file.open(QFile::ReadOnly) )
     {
@@ -449,8 +456,8 @@ bool applist_t::loadList()
     qSort(fileinfo_list.begin(),fileinfo_list.end());
     this->setEnabled(true);
 
-    ui->progressBar->deleteLater();
-    ui->lbLoad->deleteLater();
+    ui->progressBar->hide();
+    ui->lbLoad->hide();
     ui->horizontalLayout->insertSpacerItem(3,new QSpacerItem(40, 10, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
     QFile categories_file("Info/TreeInfo.xml");
