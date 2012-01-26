@@ -72,23 +72,6 @@ void UpdaterDialog::onProgress(qint64 recv,qint64 tot)
     ui->progressBar->setValue(recv);
 }
 
-void UpdaterDialog::onCategoryTreeDownloaded()
-{
-    QNetworkReply *reply = (QNetworkReply*)sender();
-    QString html = reply->readAll();
-    if(html.isEmpty())
-    {
-        qDebug("failed to get treeInfo.xml");
-        return;
-    }
-
-    QFile file("Info/TreeInfo.xml");
-    if( !file.open(QFile::WriteOnly) )
-        qDebug("failed to open file TreeInfo.xml");
-
-    file.write(html.toAscii());
-    file.close();
-}
 
 void UpdaterDialog::onAppListDownloaded()
 {
@@ -130,7 +113,7 @@ void UpdaterDialog::onAppListDownloaded()
         node = node.nextSiblingElement();
     }
 
-    m_count = m_max = dlAppinfo.count()+1;
+    m_count = m_max = dlAppinfo.count();
     qDebug("downloading %d files",m_count);
 
     if( m_type == update_check_appinfo )
@@ -144,10 +127,6 @@ void UpdaterDialog::onAppListDownloaded()
     connect(&qnam, SIGNAL(finished(QNetworkReply*)),SLOT(ondownloadFinished(QNetworkReply*)));
 
     QString url;
-    url = "http://appdriverupdate.sourceforge.net/Apps/Files/TreeInfo.xml";
-    reply = qnam.get(QNetworkRequest(url));
-    connections.append(reply);
-    connect(reply,SIGNAL(finished()),SLOT(onCategoryTreeDownloaded()));
 
     for(int i=0;i<dlAppinfo.count();i++)
     {

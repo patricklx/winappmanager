@@ -11,10 +11,46 @@ Q_IMPORT_PLUGIN(qico)
 #endif
 
 
+void myMessageHandler(QtMsgType type, const char *msg)
+{
+    QString txt;
+    switch (type) {
+        case QtDebugMsg:
+            txt = QString("%1").arg(msg);
+        break;
+        case QtWarningMsg:
+            txt = QString("Warning: %1").arg(msg);
+        break;
+        case QtCriticalMsg:
+            txt = QString("Critical: %1").arg(msg);
+        break;
+        case QtFatalMsg:
+            txt = QString("Fatal: %1").arg(msg);
+            abort();
+    }
+
+    QFile outFile("log.txt");
+    outFile.open(QIODevice::WriteOnly | QIODevice::Append);
+    QTextStream ts(&outFile);
+    ts << txt << endl;
+}
+
 int main(int argc, char *argv[])
 {
     QDir::setCurrent(QString(argv[0]).beforeLast('\\'));
     QApplication a(argc, argv);
+
+
+    QStringList cmdline_args = a.arguments();
+    if( cmdline_args.contains("debug") )
+    {
+        QFile outFile("log.txt");
+        outFile.remove();
+        qDebug("setting qMsgHandler");
+        qInstallMsgHandler(myMessageHandler);
+        qDebug("qMsgHandler set");
+    }
+
     a.setQuitOnLastWindowClosed(false);
     SettingsDialog::loadSettings();
 

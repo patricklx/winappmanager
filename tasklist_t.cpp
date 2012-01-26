@@ -6,6 +6,7 @@
 #include <QUrl>
 #include <QDesktopServices>
 #include <QMessageBox>
+#include <QInputDialog>
 #include "task_t.h"
 #include "tasklist_t.h"
 #include "ui_tasklist_t.h"
@@ -61,7 +62,7 @@ void tasklist_t::removeTask(appinfo_t *info)
     for(int i=0;i<items.count();i++)
     {
         item = items[i];
-        t = item->data(0,QTreeWidgetItem::UserType).value<task_t*>();;
+        t = item->data(0,QTreeWidgetItem::UserType).value<task_t*>();
         appinfo_t *item_info = t->m_appinfo;
         if(item_info==info)
             break;
@@ -117,11 +118,14 @@ void tasklist_t::addTask(task_t *task)
                 connect(task,SIGNAL(finished()),SLOT(onSilentTaskFinished()));
             else
                 connect(task,SIGNAL(finished()),SLOT(onTaskFinished()));
+	    connect(task,SIGNAL(askUserToExecute(QStringList,int*)),SLOT(userChooseExecutable(QStringList,int*)),Qt::BlockingQueuedConnection);
         }
     }
 
     QTreeWidgetItem *item = new QTreeWidgetItem();
-    item->setText(1,task->m_appinfo->Name+" " + task->m_inet_file.description);
+    if(task->isSet(task_t::UNINSTALL))
+	task->m_inet_file.description = "uninstalling";
+    item->setText(1,task->m_appinfo->Name+" - " + task->m_inet_file.description);
     task->m_item = item;
 
     if(task->isSet(task_t::UNINSTALL))
@@ -192,8 +196,11 @@ void tasklist_t::onDownloadFinished()
     qDebug("download finished");
     task_t *t = (task_t*)sender();
     t->wait();
-
     t->disconnect();
+    connect(t,SIGNAL(askUserToExecute(QStringList,int*)),SLOT(userChooseExecutable(QStringList,int*)),Qt::BlockingQueuedConnection);
+
+    emit updateAppInfo(t->m_appinfo);
+
     connect(t,SIGNAL(progress(task_t*,int,QString)),SLOT(updateProgressInfo(task_t*,int,QString)));
 
     if( t->isSet(task_t::SILENT) )
@@ -254,7 +261,7 @@ void tasklist_t::onSilentTaskFinished()
 {
     qDebug("silent task finished");
     task_t *t = (task_t*)sender();
-
+    emit updateAppInfo(t->m_appinfo);
     silentInstallList.removeOne(t);
     isInstalling = false;
     on_commandLinkButton_clicked();
@@ -385,7 +392,7 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
 
     if(task->isRunning() && task->current_task() == task_t::INSTALL)
     {
-	menu.addAction("start next installer");
+	menu.addAction("detach process");
     }
 
     if(!task->isRunning() && (task->isSet(task_t::DOWNLOAD) || task->isSet(task_t::INSTALL) || task->isSet(task_t::UNINSTALL)) )
@@ -395,12 +402,15 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
 
     if(!task->isRunning() && !task->isSet(task_t::DOWNLOAD))
     {
-	menu.addAction("execute installer");
+	if(task->m_appinfo->isFlagSet(appinfo_t::NO_REGISTRY))
+	    menu.addAction("execute program");
+	else
+	    menu.addAction("execute installed");
     }
 
     if(!task->isRunning() && task->isSet(task_t::INSTALL))
     {
-        menu.addAction("force installed version to latest");
+        menu.addAction("Set to latest version");
     }
 
     menu.addSeparator();
@@ -441,7 +451,7 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
             QMessageBox::information(this,"restarting task","The task is already running");
     }
 
-    if( action->text() == "force installed version to latest" )
+    if( action->text() == "Set to latest version" )
     {
         if( !task->m_appinfo->forceRegistryToLatestVersion() )
             updateProgressInfo(task,0,"failed to set latest version in registry, try again as Admin!");
@@ -454,7 +464,7 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
         QDesktopServices::openUrl(tr("file:///%1").arg(task->m_appinfo->Path));
     }
 
-    if( action->text() == "execute installer")
+    if( action->text() == "execute installer" || action->text() == "execute program" )
     {
 	appinfo_t *info = task->m_appinfo;
 	QDesktopServices::openUrl(tr("file:///%1").arg(info->Path+"/"+info->fileName));
@@ -468,17 +478,9 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
 	updateProgressInfo(task,0,"removed from install queue");
     }
 
-    if( action->text() == "start next installer")
+    if( action->text() == "detach process")
     {
-	if(task->isSet(task_t::SILENT))
-	{
-    	    silentInstallList.removeOne(task);
-	}else
-	{
-	    installList.removeOne(task);
-	}
-	isInstalling = false;
-	on_commandLinkButton_clicked();
+	task->stop();
     }
 
 }
@@ -487,5 +489,41 @@ void tasklist_t::on_LTaskList_customContextMenuRequested(const QPoint &pos)
 
 bool tasklist_t::isEmpty()
 {
-    return ui->LTaskList->topLevelItemCount()==0;
+    for(int i=0; i < ui->LTaskList->topLevelItemCount();i++)
+    {
+        QTreeWidgetItem *item = ui->LTaskList->topLevelItem(i);
+        task_t *t = item->data(0,QTreeWidgetItem::UserType).value<task_t*>();
+        if(t->isRunning())
+            return false;
+    }
+    while(ui->LTaskList->topLevelItemCount()>0)
+    {
+        QTreeWidgetItem *item = ui->LTaskList->topLevelItem(0);
+        task_t *t = item->data(0,QTreeWidgetItem::UserType).value<task_t*>();
+        removeTask(t->m_appinfo);
+    }
+    return true;
 }
+
+
+void tasklist_t::userChooseExecutable(QStringList list, int *answer)
+{
+    bool ok;
+    QInputDialog dialog(this);
+    dialog.setOption(QInputDialog::UseListViewForComboBoxItems,true);
+    dialog.setWindowTitle("Choose executable");
+    dialog.setLabelText("We were unable to determine the right executable to install the program.\nPlease choose one executable or cancel if it's not installable");
+    dialog.setComboBoxItems(list);
+    dialog.exec();
+    ok = dialog.result();
+    QString text = dialog.textValue();
+
+
+ if(ok && !text.isEmpty())
+ {
+     *answer = list.indexOf(text);
+ }else
+     *answer = -1;
+}
+
+

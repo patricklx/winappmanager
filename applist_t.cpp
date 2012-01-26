@@ -17,15 +17,15 @@ Q_DECLARE_METATYPE(applist_t::fileinfo_t)
 
 class TreeWidgetItem : public QTreeWidgetItem
 {
-public:
-    TreeWidgetItem(QStringList &list):QTreeWidgetItem(list){}
-    virtual bool operator<(const QTreeWidgetItem &other) const
-    {
-        if(this->treeWidget()->sortColumn()==0)
-            return text( 0 ).toLower() < other.text( 0 ).toLower();
-        else
-            return QTreeWidgetItem::operator <(other);
-    }
+    public:
+        TreeWidgetItem(QStringList &list):QTreeWidgetItem(list){}
+        virtual bool operator<(const QTreeWidgetItem &other) const
+        {
+            if(this->treeWidget()->sortColumn()==0)
+                return text( 0 ).toLower() < other.text( 0 ).toLower();
+            else
+                return QTreeWidgetItem::operator <(other);
+        }
 };
 
 applist_t::applist_t(QWidget *parent) :
@@ -35,6 +35,8 @@ applist_t::applist_t(QWidget *parent) :
     ui->setupUi(this);
     this->setEnabled(false);
     info_updates_avail = false;
+    searching = false;
+    stop_searching = false;
     version_updates_avail = false;
     ui->LAppInfoList->sortItems(0,Qt::AscendingOrder);
 
@@ -88,18 +90,18 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
     QMenu menu;
     if(info->isFlagSet(appinfo_t::NO_INFO))
     {
-	menu.addAction("Uninstall");
-	goto execute;
+        menu.addAction("Uninstall");
+        goto execute;
     }
     if(info->isFlagSet(appinfo_t::SELECTED_INST_DL) || info->isFlagSet(appinfo_t::SELECTED_REM))
-	menu.addAction("Unselect");
+        menu.addAction("Unselect");
     else
-	menu.addAction("Select");
+        menu.addAction("Select");
     menu.addAction("Check Latest Version");
     menu.addSeparator();
 
     if( info->isFlagSet(appinfo_t::UPDATE_AVAIL) )
-	menu.addAction("Update");
+        menu.addAction("Update");
 
 
     if( info->isFlagSet(appinfo_t::INSTALLED) )
@@ -112,13 +114,16 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
     menu.addSeparator();
     if( info->isFlagSet(appinfo_t::DOWNLOADED) )
     {
-        menu.addAction("Execute installer");
+        if(info->isFlagSet(appinfo_t::NO_REGISTRY))
+            menu.addAction("Execute program");
+        else
+            menu.addAction("Execute installer");
         menu.addAction("Delete downloaded File");
         menu.addAction("Open containing Folder");
     }
     menu.addSeparator();
     if( info->isFlagSet(appinfo_t::INSTALLED) && info->isFlagSet(appinfo_t::UPDATE_AVAIL) )
-        menu.addAction("force latest version");
+        menu.addAction("Set to latest version");
     if( info->isFlagSet(appinfo_t::INSTALLED) || info->isFlagSet(appinfo_t::DOWNLOADED) )
     {
         if(info->isFlagSet(appinfo_t::IGNORE_LATEST))
@@ -130,16 +135,19 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
 
     if(info->version_info.url.contains("filehippo") )
     {
-	if(info->isFlagSet(appinfo_t::FILEHIPPO_BETA))
-	    menu.addAction("disable Beta");
-	if(!info->isFlagSet(appinfo_t::FILEHIPPO_BETA))
-	    menu.addAction("enable Beta");
+        if(info->isFlagSet(appinfo_t::FILEHIPPO_BETA))
+            menu.addAction("disable Beta");
+        if(!info->isFlagSet(appinfo_t::FILEHIPPO_BETA))
+            menu.addAction("enable Beta");
     }
+
+    menu.addSeparator();
+    menu.addAction("report a problem");
 
     /***************************************************
      Execute menu
      ***************************************************/
-    execute:
+execute:
 
     menu.move(ui->LAppInfoList->mapToGlobal(pos+QPoint(0,25)));
     QAction *action = menu.exec();
@@ -187,20 +195,19 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
     if( action->text() == "ReInstall")
     {
         task_t *task = new task_t(info,task_t::INSTALL);
-	if(!task->m_appinfo->install_param.isEmpty() && task->m_appinfo->install_param!="ALWAYS"
-		&& !task->m_appinfo->isFlagSet(appinfo_t::ONLY_SILENT))
+        if(!task->m_appinfo->install_param.isEmpty() && !task->m_appinfo->isFlagSet(appinfo_t::ONLY_SILENT))
         {
             switch(SettingsDialog::getInstallMode())
             {
-            case SettingsDialog::ASK:
-            {
-                int ans = QMessageBox::question(this,"Install Mode",tr("%1 :Install in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
-                if(ans == QMessageBox::Yes)
+                case SettingsDialog::ASK:
+                {
+                    int ans = QMessageBox::question(this,"Install Mode",tr("%1 :Install in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
+                    if(ans == QMessageBox::Yes)
+                        task->set(task_t::SILENT);
+                    break;
+                }
+                case SettingsDialog::SILENT:
                     task->set(task_t::SILENT);
-                break;
-            }
-            case SettingsDialog::SILENT:
-                task->set(task_t::SILENT);
             }
         }
         emit taskChosen(task);
@@ -208,7 +215,7 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
         item->setIcon(0,info->getIcon());
     }
 
-    if( action->text() == "Execute installer")
+    if( action->text() == "Execute installer" || action->text() == "Execute program")
     {
         QDesktopServices::openUrl(tr("file:///%1").arg(info->Path+"/"+info->fileName));
     }
@@ -220,11 +227,12 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
     {
         QFile::remove( info->Path + "/" + info->fileName);
         info->unSetFlag(appinfo_t::DOWNLOADED);
+        info->unSetFlag(appinfo_t::UPDATE_AVAIL);
         info->DlVersion.clear();
         updateItem(info);
     }
 
-    if( action->text() == "force latest version")
+    if( action->text() == "Set to latest version")
     {
         if( !info->forceRegistryToLatestVersion() )
             QMessageBox::information(this,"setting registry value","failed to force latest version , try again as admin!");
@@ -236,18 +244,31 @@ void applist_t::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
         info->setFlag(appinfo_t::IGNORE_LATEST);
         info->unSetFlag(appinfo_t::UPDATE_AVAIL);
         info->LatestVersion.clear();
+        updateItem(info);
     }
     if( action->text() == "unset ignore newer versions")
     {
         info->unSetFlag(appinfo_t::IGNORE_LATEST);
         info->updateVersion();
+        updateItem(info);
     }
 
     if( action->text() == "disable Beta")
-	info->setFilehippoBeta(false);
+    {
+        info->setFilehippoBeta(false);
+        info->updateVersion();
+    }
 
     if( action->text() == "enable Beta")
-	    info->setFilehippoBeta(true);
+    {
+        info->setFilehippoBeta(true);
+        info->updateVersion();
+    }
+
+    if( action->text() == "report a problem")
+    {
+        QDesktopServices::openUrl("http://appdriverupdate.sourceforge.net/Apps/Apps.php?report="+info->Name);
+    }
 }
 
 void applist_t::updateItem(appinfo_t *appinfo)
@@ -307,9 +328,9 @@ void applist_t::saveList()
     doc.appendChild(root);
     for(int i=0;i<fileinfo_list.count();i++)
     {
-	if(fileinfo_list[i].info->isFlagSet(appinfo_t::NO_INFO))
-	    continue;
-	QDomElement node = doc.createElement("PKG");
+        if(fileinfo_list[i].info->isFlagSet(appinfo_t::NO_INFO))
+            continue;
+        QDomElement node = doc.createElement("PKG");
         node.setAttribute("name",fileinfo_list.at(i).name);
         node.setAttribute("LastUpdate",fileinfo_list.at(i).lastUpdate);
         root.appendChild(node);
@@ -340,21 +361,30 @@ void applist_t::setRegistryInfo(registry_group_t group)
     if(name.isEmpty())
         return;
 
+    qDebug()<<"registry app: "<<name;
+
     QList<fileinfo_t>::iterator i;
     for(i = fileinfo_list.begin();i!=fileinfo_list.end();i++)
     {
         fileinfo_t *info = &(*i);
+        if(info->info->isFlagSet(appinfo_t::NO_REGISTRY))
+            continue;
         if(name.toUpper().contains(info->info->registry_info.seachValue.toUpper() ) ||
            groupName.toUpper().contains(info->info->registry_info.seachValue.toUpper()))
         {
             if(!info->info->registry_info.path.isEmpty())
             {
-		return;
+                if(info->info->registry_info.displayName==group.displayed_name)
+                {
+                    qDebug()<<"already in list";
+                    return;
+                }
+                else
+                    break;
             }
 
+            qDebug()<<"found in list: " << info->name;
             info->info->setRegistryInfo(&group);
-            qDebug(info->name.toAscii());
-            qDebug(info->info->registry_info.path.toAscii());
             return;
         }
     }
@@ -362,15 +392,43 @@ void applist_t::setRegistryInfo(registry_group_t group)
     if(!SettingsDialog::showAllApps())
         return;
 
+    qDebug()<<"added " <<group.displayed_name;
     fileinfo_t fileinfo;
     fileinfo.info = new appinfo_t(group.displayed_name);
     fileinfo.info->setRegistryInfo(&group);
     fileinfo.info->setFlag(appinfo_t::NO_INFO);
+    fileinfo.info->setFlag(appinfo_t::INSTALLED);
     fileinfo.info->registry_info.displayName = group.displayed_name;
     fileinfo.name = group.displayed_name;
 
 
+
     fileinfo_list.append(fileinfo);
+}
+
+
+void applist_t::addCategory(QStringList categorylist)
+{
+    QTreeWidgetItem *parent=ui->TCategoryTree->invisibleRootItem();
+    for(int i=0;i<categorylist.count();i++)
+    {
+        QString category = categorylist[i];
+        QTreeWidgetItem *child = NULL;
+        for(int a=0;a<parent->childCount();a++)
+        {
+            if(parent->child(a)->text(0)==category)
+            {
+                child = parent->child(a);
+                break;
+            }
+        }
+        if(child==NULL)
+        {
+            child = new QTreeWidgetItem(parent);
+            child->setText(0,category);
+        }
+        parent = child;
+    }
 }
 
 bool applist_t::loadList()
@@ -380,7 +438,6 @@ bool applist_t::loadList()
     clear();
     ui->progressBar->show();
     ui->progressBar->setValue(0);
-    //ui->lbLoad->show();
     QApplication::processEvents();
 
     if( !appinfolist_file.open(QFile::ReadOnly) )
@@ -413,6 +470,8 @@ bool applist_t::loadList()
         return false;
     }
 
+    qDebug()<<"load list:";
+
     QDomElement node = doc.documentElement();
 
     node = node.firstChildElement();
@@ -437,6 +496,7 @@ bool applist_t::loadList()
             {
                 fileinfo_list.append(fileinfo);
                 connect(fileinfo.info,SIGNAL(infoUpdated(appinfo_t*,bool)),SLOT(updateItem(appinfo_t*)));
+                addCategory(fileinfo.info->categories);
             }
             else
                 delete fileinfo.info;
@@ -444,45 +504,23 @@ bool applist_t::loadList()
         node = node.nextSiblingElement();
     }
     saveList();
-
+    qDebug()<<"end load list";
 
     appinfo_registry_t reginfo;
     ui->progressBar->setMaximum(reginfo.getCount());
 
+    qDebug()<< "registry:";
     qRegisterMetaType<registry_group_t>();
     connect(&reginfo,SIGNAL(registry_app_info(registry_group_t)),SLOT(setRegistryInfo(registry_group_t)));
     reginfo.getAppsFromRegistry();
 
+    qDebug()<< "registry end";
     qSort(fileinfo_list.begin(),fileinfo_list.end());
     this->setEnabled(true);
 
     ui->progressBar->hide();
     ui->lbLoad->hide();
-    ui->horizontalLayout->insertSpacerItem(3,new QSpacerItem(40, 10, QSizePolicy::Expanding, QSizePolicy::Minimum));
-
-    QFile categories_file("Info/TreeInfo.xml");
-    if( !categories_file.open(QFile::ReadOnly) )
-    {
-        qDebug("failed to open Info/TreeInfo.xml");
-        return false;
-    }
-
-    doc.clear();
-    if( !doc.setContent(&categories_file) )
-    {
-        qDebug("failed to set content");
-        return false;
-    }
-
-    node = doc.documentElement().firstChildElement();
-    QTreeWidgetItem *root = new QTreeWidgetItem();
-    loadCategoryTree(node,root);
-    while(root->childCount()>0)
-    {
-        QTreeWidgetItem *child = root->child(0);
-        root->removeChild(child);
-        ui->TCategoryTree->addTopLevelItem(child);
-    }
+    ui->horizontalLayout->insertSpacerItem(4,new QSpacerItem(40, 10, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
     QTreeWidgetItem *item;
     item = new QTreeWidgetItem(QStringList("Updates"));
@@ -509,7 +547,7 @@ bool applist_t::loadList()
     ui->TCategoryTree->setCurrentItem(ui->TCategoryTree->topLevelItem(0),0,QItemSelectionModel::Select);
 
     if( (SettingsDialog::shouldCheckAppInfo() && SettingsDialog::lastInfoUpdate() < QDate::currentDate())
-            || fileinfo_list.isEmpty())
+        || fileinfo_list.isEmpty())
     {
         if(!listDownloaded)
             QTimer::singleShot(500,this,SLOT(onCheckForNewAppInfo()));
@@ -615,7 +653,7 @@ void applist_t::setListByCategory(QString cat)
         if(flag==appinfo_t::NO_INFO)
         {
             ui->AppInfoText->hide();
-            ui->LAppInfoList->setColumnCount(1);
+            ui->LAppInfoList->setColumnCount(2);
         }
 
         if(flag == appinfo_t::UPDATE_AVAIL && ui->LAppInfoList->topLevelItemCount()>0)
@@ -640,6 +678,15 @@ void applist_t::on_LAppInfoList_itemActivated(QTreeWidgetItem *item, int column)
     applist_t::fileinfo_t data = item->data(0,QTreeWidgetItem::UserType).value<applist_t::fileinfo_t>();
     appinfo_t *info = data.info;
 
+    //if it was selected remove it
+    if( info->isFlagSet(appinfo_t::SELECTED_INST_DL) || info->isFlagSet(appinfo_t::SELECTED_REM))
+    {
+        emit unSelected(info);
+        return;
+    }
+
+
+    //select item and ask user (if necessary) if the task should run in silent or attendet mode
     if( !info->isFlagSet(appinfo_t::SELECTED_REM) && !info->isFlagSet(appinfo_t::SELECTED_INST_DL) )
     {
         task_t *task = NULL;
@@ -680,12 +727,6 @@ void applist_t::on_LAppInfoList_itemActivated(QTreeWidgetItem *item, int column)
         if(info->isFlagSet(appinfo_t::INSTALLED))
         {
             task = new task_t(info,task_t::UNINSTALL);
-            if( (!info->uninstall_param.isEmpty()&&info->uninstall_param!="ALWAYS")|| !info->registry_info.silent_uninstall.isEmpty())
-            {
-                int ans = QMessageBox::question(this,"Uninstall Mode",tr("%1 :UNinstall in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
-                if(ans == QMessageBox::Yes)
-                    task->set(task_t::SILENT);
-            }
             info->setFlag(appinfo_t::SELECTED_REM);
             goto chosen;
         }
@@ -719,47 +760,67 @@ void applist_t::on_LAppInfoList_itemActivated(QTreeWidgetItem *item, int column)
         }
 
 
-        chosen:
+chosen:
 
         if(task!=NULL)
         {
             if(task->isSet(task_t::INSTALL) && !info->isFlagSet(appinfo_t::UPDATE_AVAIL))
             {
-                if(!task->m_appinfo->install_param.isEmpty() && task->m_appinfo->install_param!="ALWAYS" && !task->m_appinfo->isFlagSet(appinfo_t::ONLY_SILENT))
+                if(!task->m_appinfo->install_param.isEmpty() && !task->m_appinfo->isFlagSet(appinfo_t::ONLY_SILENT))
                 {
                     switch(SettingsDialog::getInstallMode())
                     {
-                    case SettingsDialog::ASK:
-                    {
-                        int ans = QMessageBox::question(this,"Install Mode",tr("%1 :Install in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
-                        if(ans == QMessageBox::Yes)
+                        case SettingsDialog::ASK:
+                        {
+                            int ans = QMessageBox::question(this,"Install Mode",tr("%1 :Install in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
+                            if(ans == QMessageBox::Yes)
+                                task->set(task_t::SILENT);
+                            break;
+                        }
+                        case SettingsDialog::SILENT:
                             task->set(task_t::SILENT);
-                        break;
-                    }
-                    case SettingsDialog::SILENT:
-                        task->set(task_t::SILENT);
                     }
                 }
             }
 
             if(task->isSet(task_t::INSTALL) && info->isFlagSet(appinfo_t::UPDATE_AVAIL) && !task->m_appinfo->isFlagSet(appinfo_t::ONLY_SILENT))
             {
-                if(!task->m_appinfo->install_param.isEmpty() && task->m_appinfo->install_param!="ALWAYS")
+                if(!task->m_appinfo->install_param.isEmpty())
                 {
                     switch(SettingsDialog::getUpgradeMode())
                     {
-                    case SettingsDialog::ASK:
-                    {
-                        int ans = QMessageBox::question(this,"Upgrade Mode",tr("%1 :Upgrade in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
-                        if(ans == QMessageBox::Yes)
+                        case SettingsDialog::ASK:
+                        {
+                            int ans = QMessageBox::question(this,"Upgrade Mode",tr("%1 :Upgrade in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
+                            if(ans == QMessageBox::Yes)
+                                task->set(task_t::SILENT);
+                            break;
+                        }
+                        case SettingsDialog::SILENT:
                             task->set(task_t::SILENT);
-                        break;
-                    }
-                    case SettingsDialog::SILENT:
-                        task->set(task_t::SILENT);
                     }
                 }
             }
+
+            if(task->isSet(task_t::UNINSTALL) && !task->m_appinfo->isFlagSet(appinfo_t::ONLY_SILENT_UNINSTALL))
+            {
+                if( !info->uninstall_param.isEmpty() || !info->registry_info.silent_uninstall.isEmpty())
+                {
+                    switch(SettingsDialog::getUninstallMode())
+                    {
+                        case SettingsDialog::ASK:
+                        {
+                            int ans = QMessageBox::question(this,"Uninstall Mode",tr("%1 :UNinstall in silent mode?").arg(info->Name),QMessageBox::Yes|QMessageBox::No);
+                            if(ans == QMessageBox::Yes)
+                                task->set(task_t::SILENT);
+                            break;
+                        }
+                        case SettingsDialog::SILENT:
+                            task->set(task_t::SILENT);
+                    }
+                }
+            }
+
             if(task->m_appinfo->isFlagSet(appinfo_t::ONLY_SILENT))
                 task->set(task_t::SILENT);
 
@@ -767,11 +828,6 @@ void applist_t::on_LAppInfoList_itemActivated(QTreeWidgetItem *item, int column)
             item->setIcon(0,info->getIcon());
         }
         return;
-    }
-
-    if( info->isFlagSet(appinfo_t::SELECTED_INST_DL) || info->isFlagSet(appinfo_t::SELECTED_REM))
-    {
-        emit unSelected(info);
     }
 }
 
@@ -802,7 +858,7 @@ void applist_t::onSetAppInfoUpdated(QString name, QString lastUpdate)
         f.name = name;
         if( f.info->loadFileInfo() )
         {
-	    f.info->ParseRegistryInfo();
+            f.info->ParseRegistryInfo();
             f.info->setFlag(appinfo_t::NEW);
             fileinfo_list.append(f);
             connect(f.info,SIGNAL(infoUpdated(appinfo_t*,bool)),SLOT(updateItem(appinfo_t*)));
@@ -829,7 +885,7 @@ void applist_t::onCheckForNewAppInfo()
         dlg->exec();
     }
     if( (SettingsDialog::shouldCheckVersions() && SettingsDialog::lastVersionUpdate() < QDate::currentDate())
-            && !fileinfo_list.isEmpty())
+        && !fileinfo_list.isEmpty())
     {
         QTimer::singleShot(1000,this,SLOT(on_btUpdate_clicked()));
         SettingsDialog::setLastVersionUpdate(QDate::currentDate());
@@ -840,8 +896,8 @@ void applist_t::onNewAppInfoAvailable()
 {
     qDebug("new info");
     info_updates_avail = true;
-    ui->btUpdateInfo->setIcon(QIcon(":icons/information.ico"));
-    ui->btUpdateInfo->raise();
+    /*ui->btUpdateInfo->setIcon(QIcon(":icons/information.ico"));
+    ui->btUpdateInfo->raise();*/
     emit status("new info is available");
     if(SettingsDialog::isSetDownloadPackages())
     {
@@ -889,7 +945,7 @@ void applist_t::on_btUpdate_clicked()
         {
             fileinfo_t &f = (fileinfo_t&)fileinfo_list.at(i);
             if( f.info->isFlagSet(appinfo_t::DOWNLOADED) ||
-                    (f.info->isFlagSet(appinfo_t::INSTALLED) && !f.info->isFlagSet(appinfo_t::NO_INFO)) )
+                (f.info->isFlagSet(appinfo_t::INSTALLED) && !f.info->isFlagSet(appinfo_t::NO_INFO)) )
                 list.append(f);
         }
         if(list.count()==0)
@@ -963,12 +1019,30 @@ void applist_t::on_btUpdateInfo_clicked()
 
 void applist_t::on_lbSearch_textChanged(const QString &arg1)
 {
+    /*while(searching)
+    {
+        stop_searching = true;
+        QApplication::processEvents();
+    }
+    searching = true;*/
     ui->LAppInfoList->clear();
     QStringList strings = arg1.split(' ');
 
     for(int i=0;i<fileinfo_list.count();i++)
     {
+        /*if(stop_searching)
+        {
+            stop_searching = false;
+            break;
+        }
+        QApplication::processEvents();*/
         if( fileinfo_list.at(i).info->contains(strings) )
             appendToList(fileinfo_list[i]);
     }
+    //searching = false;
+}
+
+void applist_t::on_btReload_clicked()
+{
+    emit reload_clicked();
 }

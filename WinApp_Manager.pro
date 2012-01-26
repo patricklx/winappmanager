@@ -21,7 +21,8 @@ SOURCES += main.cpp\
     task_t.cpp \
     tasklist_t.cpp \
     applist_t.cpp \
-    appinfo_registry_t.cpp
+    appinfo_registry_t.cpp \
+    winapp_manager_updater.cpp
 
 HEADERS  += mainwindow.h \
     appinfo_t.h \
@@ -31,7 +32,8 @@ HEADERS  += mainwindow.h \
     task_t.h \
     tasklist_t.h \
     applist_t.h \
-    appinfo_registry_t.h
+    appinfo_registry_t.h \
+    winapp_manager_updater.h
 
 FORMS    += mainwindow.ui \
     settingsdialog.ui \
@@ -43,14 +45,16 @@ FORMS    += mainwindow.ui \
 RESOURCES += \
     resource.qrc
 
-    RC_FILE = appico.rc
 
-    CONFIG(release, debug|release)    {
-        message (release build)
-       CONFIG += static
-	LIBS += -L$$[QT_INSTALL_PLUGINS]/imageformats -lqico
-       QMAKE_LFLAGS += -static-libgcc
-    }
+RC_FILE = appico.rc
+
+
+CONFIG(release, debug|release)    {
+    message (release build)
+   CONFIG += static
+    LIBS += -L$$[QT_INSTALL_PLUGINS]/imageformats -lqico
+   QMAKE_LFLAGS += -static-libgcc
+}
 
 OTHER_FILES += \
     appico.rc \

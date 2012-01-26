@@ -50,9 +50,11 @@ private:
     bool setRunAsAdmin(QString path);
     void unSetRunAsAdmin(QString path);
     bool followProcessChilds(int id);
+    bool unzip();
 
 signals:
     void progress(task_t *t,int p, QString info);
+    void askUserToExecute(QStringList list,int *answer);
 };
 
 #endif // TASK_T_H

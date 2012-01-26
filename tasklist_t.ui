@@ -111,7 +111,7 @@
         </sizepolicy>
        </property>
        <property name="title">
-        <string>InstallMode</string>
+        <string>First Install...</string>
        </property>
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <item>
@@ -130,7 +130,7 @@
         <item>
          <widget class="QCheckBox" name="checkAttendet">
           <property name="text">
-           <string>Attendet</string>
+           <string>Attended</string>
           </property>
           <property name="autoExclusive">
            <bool>true</bool>

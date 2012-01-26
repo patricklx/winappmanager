@@ -18,6 +18,9 @@
 #include <appinfo_registry_t.h>
 #include <QTimer>
 #include <QDomCDATASection>
+#include <QSysInfo>
+
+#include "settingsdialog.h"
 
 #if !defined(QT_DEBUG)
 QFileIconProvider iconprovider;
@@ -29,6 +32,7 @@ appinfo_t::appinfo_t(QString app_name):
     Name = app_name;
     state = INVALID;
     downloaded_id = -1;
+    setFlag(WIN_VERSION_OK);
 }
 
 appinfo_t::~appinfo_t()
@@ -64,7 +68,7 @@ bool appinfo_t::newerVersionAvailable()
     if(v1.isEmpty() || v2.isEmpty())
         return false;
 
-    if(isFlagSet(IGNORE_LATEST))
+    if(isFlagSet(IGNORE_LATEST) || !isFlagSet(WIN_VERSION_OK))
         return false;
 
     int i;
@@ -142,6 +146,13 @@ bool appinfo_t::forceRegistryToLatestVersion()
         return false;
 }
 
+
+void appinfo_t::updateRegistryVersion()
+{
+    QSettings settings(registry_info.path);
+    QString version = settings.value("DisplayVersion").toString();
+    registry_info.version = version;
+}
 
 QNetworkReply* appinfo_t::updateVersion(QNetworkAccessManager *qnam)
 {
@@ -235,15 +246,18 @@ void appinfo_t::onHtmlVersionDownloaded()
 
     qDebug(regexString.toAscii());
 
+    //Get version base from HTML
     regex.indexIn(html);
     version = regex.cap(1);
 
     if(version.isEmpty())
     {
-        qDebug("no version found: %s",regex.errorString().toAscii().data());
-        infoUpdated(this,false);
-        return;
+	qDebug("no version found: %s",regex.errorString().toAscii().data());
+	infoUpdated(this,false);
+	return;
     }
+
+    //apply a regex replace to the base version to adapt it to the installed version
 
 
     regexString = version_info.versionRegEx;
@@ -257,11 +271,7 @@ void appinfo_t::onHtmlVersionDownloaded()
 
     LatestVersion = version;
 
-    if( !InstalledVersion.isEmpty() && newerVersionAvailable())
-    {
-        setFlag(UPDATE_AVAIL);
-    }
-    else if( InstalledVersion.isEmpty() && newerVersionAvailable() )
+    if( newerVersionAvailable())
     {
         setFlag(UPDATE_AVAIL);
     }
@@ -270,7 +280,7 @@ void appinfo_t::onHtmlVersionDownloaded()
         unSetFlag(UPDATE_AVAIL);
     }
 
-    LastVersionCheck = QDate::currentDate().toString("dd/MM/yy");
+    LastVersionCheck = QDate::currentDate().toString(Qt::DefaultLocaleShortDate);
     saveApplicationInfo();
 
     emit infoUpdated(this,true);
@@ -303,7 +313,7 @@ void appinfo_t::setFilehippoBeta(bool enable)
         setFlag(FILEHIPPO_BETA);
     else
         unSetFlag(FILEHIPPO_BETA);
-    saveApplicationInfo();
+    saveApplicationInfo(true);
 }
 
 appinfo_t::file_info_t appinfo_t::getFileInfoByDlId()
@@ -337,7 +347,7 @@ QString appinfo_t::getDownloadURL(file_info_t &inet_file)
 
         QNetworkAccessManager qnam;
         QNetworkRequest request = QNetworkRequest(url);
-        if(url.contains("filehippo") && !isFlagSet(FILEHIPPO_BETA))
+        if(url.contains("filehippo") && !isFlagSet(FILEHIPPO_BETA) )
             request.setRawHeader("Cookie","Filter=NOBETA=1&NODEMO=0");
         QNetworkReply *reply = qnam.get(request);
         connect(reply,SIGNAL(finished()),&eventloop,SLOT(quit()));
@@ -405,6 +415,14 @@ QIcon appinfo_t::getIcon()
             return app_icon;
     }
 
+    if( isFlagSet(NO_REGISTRY) )
+    {
+	if( app_icon.isNull() )
+	    return QIcon(":icons/IsInstalled.ico");
+	else
+	    return app_icon;
+    }
+
     if( isFlagSet(DOWNLOADED) )
         return QIcon(":icons/IsDL.ico");
 
@@ -415,7 +433,7 @@ QIcon appinfo_t::getIcon()
 }
 
 
-void appinfo_t::saveApplicationInfo()
+void appinfo_t::saveApplicationInfo(bool filehippo_beta_change)
 {
     QFile xmldoc("Info/"+Name+".xml");
     if( !xmldoc.open(QFile::ReadOnly) )
@@ -440,7 +458,8 @@ void appinfo_t::saveApplicationInfo()
             node.setAttribute("LastCheck",LastVersionCheck);
             node.setAttribute("isNew",isFlagSet(NEW));
             node.setAttribute("ignore_latest_version",isFlagSet(IGNORE_LATEST));
-            node.setAttribute("filehippoBeta",isFlagSet(FILEHIPPO_BETA));
+            if(filehippo_beta_change)
+                node.setAttribute("filehippoBeta",isFlagSet(FILEHIPPO_BETA));
             xmldoc.open(QFile::WriteOnly);
             xmldoc.write( doc.toString().toUtf8() );
             return;
@@ -458,14 +477,64 @@ void appinfo_t::saveApplicationInfo()
     node.setAttribute("LastCheck",LastVersionCheck);
     node.setAttribute("isNew",isFlagSet(NEW));
     node.setAttribute("ignore_latest_version",isFlagSet(IGNORE_LATEST));
-    node.setAttribute("filehippoBeta",isFlagSet(FILEHIPPO_BETA));
+    if(filehippo_beta_change)
+        node.setAttribute("filehippoBeta",isFlagSet(FILEHIPPO_BETA));
     xmldoc.open(QFile::WriteOnly);
     xmldoc.write( doc.toString().toUtf8() );
 }
 
 
+void appinfo_t::checkMaxWinVersion(QString max_version)
+{
+    QSysInfo::WinVersion version =  QSysInfo::windowsVersion();
+    if(max_version == "XP" && version>QSysInfo::WV_XP)
+        unSetFlag(WIN_VERSION_OK);
+    if(max_version == "VISTA" && version>QSysInfo::WV_VISTA)
+        unSetFlag(WIN_VERSION_OK);
+    if(max_version == "WIN7" && version>QSysInfo::WV_WINDOWS7)
+        unSetFlag(WIN_VERSION_OK);
 
+    if(max_version == "XP64" && (version>QSysInfo::WV_XP || QSysInfo::WordSize != 64) )
+        unSetFlag(WIN_VERSION_OK);
+    if(max_version == "VISTA64" && (version>QSysInfo::WV_VISTA || QSysInfo::WordSize != 64) )
+        unSetFlag(WIN_VERSION_OK);
+    if(max_version == "WIN764" && (version>QSysInfo::WV_WINDOWS7 || QSysInfo::WordSize != 64) )
+        unSetFlag(WIN_VERSION_OK);
 
+    if(max_version == "XP32" && (version>QSysInfo::WV_XP || QSysInfo::WordSize == 64) )
+        unSetFlag(WIN_VERSION_OK);
+    if(max_version == "VISTA32" && (version>QSysInfo::WV_VISTA || QSysInfo::WordSize == 64) )
+        unSetFlag(WIN_VERSION_OK);
+    if(max_version == "WIN732" && (version>QSysInfo::WV_WINDOWS7 || QSysInfo::WordSize == 64) )
+        unSetFlag(WIN_VERSION_OK);
+
+}
+
+void appinfo_t::checkMinWinVersion(QString min_version)
+{
+    QSysInfo::WinVersion version =  QSysInfo::windowsVersion();
+    if(min_version == "XP" && version<QSysInfo::WV_XP)
+        unSetFlag(WIN_VERSION_OK);
+    if(min_version == "VISTA" && version<QSysInfo::WV_VISTA)
+        unSetFlag(WIN_VERSION_OK);
+    if(min_version == "WIN7" && version<QSysInfo::WV_WINDOWS7)
+        unSetFlag(WIN_VERSION_OK);
+
+    if(min_version == "XP64" && (version<QSysInfo::WV_XP || QSysInfo::WordSize != 64) )
+        unSetFlag(WIN_VERSION_OK);
+    if(min_version == "VISTA64" && (version<QSysInfo::WV_VISTA || QSysInfo::WordSize != 64) )
+        unSetFlag(WIN_VERSION_OK);
+    if(min_version == "WIN764" && (version<QSysInfo::WV_WINDOWS7 || QSysInfo::WordSize != 64) )
+        unSetFlag(WIN_VERSION_OK);
+
+    if(min_version == "XP32" && (version<QSysInfo::WV_XP || QSysInfo::WordSize == 64) )
+        unSetFlag(WIN_VERSION_OK);
+    if(min_version == "VISTA32" && (version<QSysInfo::WV_VISTA || QSysInfo::WordSize == 64) )
+        unSetFlag(WIN_VERSION_OK);
+    if(min_version == "WIN732" && (version<QSysInfo::WV_WINDOWS7 || QSysInfo::WordSize == 64) )
+        unSetFlag(WIN_VERSION_OK);
+
+}
 
 bool appinfo_t::loadFileInfo()
 {
@@ -484,13 +553,19 @@ bool appinfo_t::loadFileInfo()
         return false;
     }
 
-    state = INVALID;
+    setFlag(NO_REGISTRY);
 
     QDomElement node = doc.documentElement();
 
     Description = node.firstChildElement("DESCRIPTION").firstChild().nodeValue();
     Info        = node.firstChildElement("INFO").firstChild().nodeValue();
     WebPage     = node.firstChildElement("WEBPAGE").firstChild().nodeValue();
+
+    QString min_version = node.firstChildElement("MIN_WIN_VERSION").firstChild().nodeValue();
+    checkMinWinVersion(min_version);
+
+    QString max_version = node.firstChildElement("MAX_WIN_VERSION").firstChild().nodeValue();
+    checkMaxWinVersion(max_version);
 
     node = node.firstChildElement();
 
@@ -560,7 +635,6 @@ bool appinfo_t::loadFileInfo()
 
                 version_info.urlRegEx     = QRegExp::escape(StartString) + "(.{1,20})" + QRegExp::escape(EndString);
             }
-            qDebug("'%s'",version_info.urlRegEx.toAscii().data());
 
             version_info.versionRegEx = node.lastChildElement("versionRegEx").firstChild().nodeValue();
             if(version_info.versionRegEx.isEmpty())
@@ -572,6 +646,7 @@ bool appinfo_t::loadFileInfo()
 
             if(node.attribute("filehippoBeta",0).toInt()==1)
                 setFlag(FILEHIPPO_BETA);
+
         }
 
         if( node.tagName() == "REGISTRY" )
@@ -580,6 +655,7 @@ bool appinfo_t::loadFileInfo()
             registry_info.version_path.clear();
             registry_info.path.clear();
             registry_info.version.clear();
+	    unSetFlag(NO_REGISTRY);
 
             if( QSysInfo::WordSize == 64 )
             {
@@ -602,6 +678,7 @@ bool appinfo_t::loadFileInfo()
         if( node.tagName() == "INSTALL" )
         {
             node.removeAttribute("time");
+	    zipExeRegex = node.attribute("zipExeRegex");
             if( node.attribute("silent").toInt()==1 )
                 setFlag(ONLY_SILENT);
             if( node.attribute("admin").toInt()==1 )
@@ -615,8 +692,12 @@ bool appinfo_t::loadFileInfo()
         if( node.tagName() == "REMOVE" )
         {
             node.removeAttribute("time");
+            if( node.attribute("silent").toInt()==1 )
+                setFlag(ONLY_SILENT_UNINSTALL);
             uninstall_param = node.attribute("params").trimmed();
             uninstall_lastProcessName = node.attribute("lastProcessName");
+            if( node.attribute("admin").toInt()==1 )
+                setFlag(ADMIN);
         }
 
         if( node.tagName() == "APP_INFO" )
@@ -630,8 +711,9 @@ bool appinfo_t::loadFileInfo()
             if(ok)setFlag(NEW);
             ok = node.attribute("ignore_latest_version","0").toInt();
             if(ok)setFlag(IGNORE_LATEST);
-            ok = node.attribute("filehippoBeta","0").toInt();
-            if(ok)setFlag(FILEHIPPO_BETA);
+            int beta = node.attribute("filehippoBeta","0").toInt();
+            if(beta==1)setFlag(FILEHIPPO_BETA);
+            else if(beta==0) unSetFlag(FILEHIPPO_BETA);
         }
 
         if( node.tagName() == "CATEGORYS")
@@ -665,12 +747,7 @@ bool appinfo_t::loadFileInfo()
     }else
         DlVersion.clear();
 
-    if( registry_info.seachValue.contains("\\") || registry_info.version_path.contains("\\") )
-    {
-        qDebug("parse registry for: %s",Name.toAscii().data());
-        if(ParseRegistryInfo())
-            setFlag(INSTALLED);
-    }
+
 
     if( newerVersionAvailable() )
         setFlag(UPDATE_AVAIL);
@@ -681,6 +758,15 @@ bool appinfo_t::loadFileInfo()
     if(!isFlagSet(DOWNLOADED))
         setFlag(ONLY_INFO);
 
+    if( registry_info.seachValue.contains("\\") || registry_info.version_path.contains("\\"))
+    {
+        qDebug("parse registry for: %s",Name.toAscii().data());
+        if(ParseRegistryInfo())
+            setFlag(INSTALLED);
+    }
+
+    if(isFlagSet(NO_REGISTRY))
+	QTimer::singleShot((qrand()%30+5)*1000,this,SLOT(delayedSetIcon()));
     /*xmldoc.close();
     if( xmldoc.open(QFile::WriteOnly) )
     {
@@ -696,9 +782,25 @@ void appinfo_t::delayedSetIcon()
 {
 #if defined(QT_DEBUG)
     QFileIconProvider iconprovider;
+    return;
 #endif
+
+    if(isFlagSet(NO_REGISTRY) && isFlagSet(DOWNLOADED))
+    {
+	QPixmap pixmap;
+	QString Fullfilename = Path+"/"+fileName;
+	if( pixmap.load(Fullfilename) )
+	    app_icon = QIcon(pixmap);
+	else
+	    app_icon = iconprovider.icon(QFileInfo(Fullfilename));
+
+	emit infoUpdated(this,false);
+	return;
+    }
+
     if(!QFile::exists(registry_info.icon))
         return;
+
     QPixmap pixmap;
     if( pixmap.load(registry_info.icon) )
         app_icon = QIcon(pixmap);
@@ -710,9 +812,18 @@ void appinfo_t::delayedSetIcon()
 
 void appinfo_t::setRegistryInfo(registry_group_t *reg_group)
 {
-    registry_info.path = reg_group->group_base+"\\"+reg_group->group_name;
+    if(!isFlagSet(WIN_VERSION_OK))
+    {
+	qDebug()<< reg_group->displayed_name <<": winversion not supported";
+        return;
+    }
 
-    qDebug("%s: %s",Name.toAscii().data(),registry_info.path.toAscii().data());
+    if(isFlagSet(NO_REGISTRY))
+	return;
+
+    registry_info.path = reg_group->group_base+reg_group->group_name;
+
+    qDebug("%s: %s\n",Name.toAscii().data(),registry_info.path.toAscii().data());
 
     registry_info.icon              = reg_group->getValue("DisplayIcon").beforeLast(",");
     registry_info.silent_uninstall  = reg_group->getValue("QuietUninstallString");
@@ -758,6 +869,11 @@ bool appinfo_t::ParseRegistryInfo()
 {
     QStringList regBase;
     QString path;
+    if(!isFlagSet(WIN_VERSION_OK))
+        return false;
+    if(isFlagSet(NO_REGISTRY))
+	return false;
+
     if( QSysInfo::WordSize == 64 )
     {
         regBase <<  "HKEY_CURRENT_USER\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\";
@@ -825,6 +941,8 @@ bool appinfo_t::ParseRegistryInfo()
                 version = version.replace(regex,registry_info.regexReplace);
                 registry_info.version = version;
 
+                qDebug("registry version found: %s",registry_info.version_path.toAscii().data());
+
                 setFlag(INSTALLED);
                 if( newerVersionAvailable() )
                     setFlag(UPDATE_AVAIL);
@@ -845,18 +963,19 @@ next:
     registry_info.path = path;
     QSettings values(path,QSettings::NativeFormat);
 
+
     registry_info.icon              = values.value("DisplayIcon").toString().remove(",0");
     registry_info.silent_uninstall  = values.value("QuietUninstallString").toString();
     registry_info.uninstall         = values.value("UninstallString").toString();
     registry_info.version           = values.value("DisplayVersion").toString();
     registry_info.displayName	    = values.value("DisplayName").toString();
 
-    if(registry_info.version.isEmpty() && registry_info.version_path=="DisplayName")
+    if(registry_info.version.isEmpty() && registry_info.version_path=="DISPLAYNAME")
     {
         registry_info.version = registry_info.displayName;
     }
 
-    if(!registry_info.version_path.isEmpty() && registry_info.version_path!="DisplayName")
+    if(!registry_info.version_path.isEmpty() && registry_info.version_path!="DISPLAYNAME")
     {
         QSettings values(registry_info.version_path.beforeLast('\\'),QSettings::NativeFormat);
         registry_info.version        = values.value(registry_info.version_path.afterLast('\\')).toString();

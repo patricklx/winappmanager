@@ -10,6 +10,8 @@
 #include <settingsdialog.h>
 #include <QApplication>
 #include <QSettings>
+#include <QDir>
+#include <QRegExp>
 #include <QProcessEnvironment>
 #include <windows.h>
 #include <shlwapi.h>
@@ -107,6 +109,8 @@ bool task_t::followProcessChilds(int pid)
     int foundProcessPID = -1;
     while(watch.elapsed()<2000)
     {
+	if(should_quit)
+	    break;
         PROCESSENTRY32 processInfo;
         HANDLE hSnapShot=CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
         processInfo.dwSize=sizeof(PROCESSENTRY32);
@@ -115,6 +119,8 @@ bool task_t::followProcessChilds(int pid)
         {
             do
             {
+		if(should_quit)
+		    break;
                 int ppid = processInfo.th32ParentProcessID;
                 if(ppid == pid)
                 {
@@ -127,9 +133,9 @@ bool task_t::followProcessChilds(int pid)
                         foundProcessPID = processInfo.th32ProcessID;
                     }else
                     {
-                        if(foundProcessPID != processInfo.th32ProcessID)
+                        if(foundProcessPID != (int)processInfo.th32ProcessID)
                         {
-                            qDebug("process pid changed %d -> %d",foundProcessPID, processInfo.th32ProcessID);
+                            qDebug("process pid changed %d -> %d",foundProcessPID, (int)processInfo.th32ProcessID);
                             return process_found;
                         }
                     }
@@ -265,6 +271,16 @@ bool task_t::uninstall()
     }
 
 
+    if(m_appinfo->isFlagSet(appinfo_t::ADMIN))
+    {
+	if( !setRunAsAdmin(launchcommand) )
+	{
+	    emit progress(this,0,"failed to start process as admin");
+	    return false;
+	}
+    }
+
+
     qDebug(launchcommand.toAscii());
     qDebug(arguments.toAscii());
     if(!arguments.isEmpty())
@@ -280,6 +296,8 @@ bool task_t::uninstall()
     if( !proc.waitForStarted() )
     {
         emit progress(this,0,proc.errorString());
+	if(m_appinfo->isFlagSet(appinfo_t::ADMIN))
+	    unSetRunAsAdmin(launchcommand);
         return false;
     }
 
@@ -287,6 +305,8 @@ bool task_t::uninstall()
 
     while(!proc.waitForFinished(0) && proc.error()==QProcess::Timedout)
     {
+	if(should_quit)
+	    break;
         if((!m_appinfo->uninstall_lastProcessName.isEmpty()) && launchcommand.contains(m_appinfo->uninstall_lastProcessName))
         {
             QThread::msleep(500);
@@ -295,17 +315,21 @@ bool task_t::uninstall()
             followProcessChilds(pid->dwProcessId);
             QThread::msleep(150);
         }
-
     }
+
+    if(m_appinfo->isFlagSet(appinfo_t::ADMIN))
+	unSetRunAsAdmin(launchcommand);
 
     qDebug(proc.errorString().toAscii());
 
-    if(!proc.waitForFinished(-1) && proc.state()==QProcess::Running )
+    if(!should_quit)
     {
-        emit progress(this,0,proc.errorString());
-        return false;
+	if( !proc.waitForFinished(-1) && proc.state()==QProcess::Running )
+	{
+	    emit progress(this,0,proc.errorString());
+	    return false;
+	}
     }
-
 
 
 
@@ -317,6 +341,7 @@ bool task_t::uninstall()
     if( !m_appinfo->ParseRegistryInfo() )
     {
         m_appinfo->unSetFlag(appinfo_t::INSTALLED);
+	m_appinfo->unSetFlag(appinfo_t::UPDATE_AVAIL);
         m_appinfo->saveApplicationInfo();
         emit progress(this,100,"successfully uninstalled");
         qDebug("uninstall finished");
@@ -330,7 +355,7 @@ bool task_t::uninstall()
 bool task_t::setRunAsAdmin(QString path)
 {
     HKEY key;
-    LONG WINAPI result = RegCreateKey(HKEY_CURRENT_USER,
+    LONG result = RegCreateKey(HKEY_CURRENT_USER,
                                       L"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers\\",
                                       &key);
 
@@ -352,13 +377,13 @@ bool task_t::setRunAsAdmin(QString path)
 void task_t::unSetRunAsAdmin(QString path)
 {
     HKEY key;
-    LONG WINAPI result = RegOpenKeyExA(HKEY_CURRENT_USER,"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers\\",
+    LONG result = RegOpenKeyExA(HKEY_CURRENT_USER,"Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers\\",
                                        0,KEY_WRITE,
                                        &key);
 
     if( result != ERROR_SUCCESS)
     {
-        qDebug("failed to delete Key: %d",result);
+        qDebug("failed to delete Key: %d",(int)result);
         return;
     }
 
@@ -367,13 +392,85 @@ void task_t::unSetRunAsAdmin(QString path)
     RegCloseKey(key);
 
     if( result != ERROR_SUCCESS)
-        qDebug("failed to delete Key: %d",result);
-
+        qDebug("failed to delete Key: %d",(int)result);
 }
+
+
+bool task_t::unzip()
+{
+    QProcess process;
+    QString filename = m_appinfo->Path+"/"+m_appinfo->fileName;
+    QString cmdline = QString("7za.exe x -y -o\"%1\" \"%2\"").arg(m_appinfo->Path).arg(filename);
+    qDebug()<<cmdline;
+    process.start(cmdline);
+
+    emit progress(this,-1,tr("Extracting files from archive %1 ...").arg(m_appinfo->fileName));
+    process.waitForStarted();
+    process.waitForReadyRead();
+    qDebug(process.readAll());
+    process.waitForFinished(-1);
+
+    QDir dir(m_appinfo->Path);
+
+    QStringList namefilter;namefilter << "*.exe";
+    QStringList list = dir.entryList(namefilter);
+    qDebug()<<list;
+
+    if(list.isEmpty())
+    {
+	emit progress(this,0,"failed to extract files");
+	qDebug("executable list is empty");
+	return false;
+    }
+
+    if(list.count()==1)
+    {
+	m_appinfo->fileName = list[0];
+	qDebug()<<m_appinfo->fileName;
+	return true;
+    }
+
+    if(list.count()>1)
+    {
+	if(!m_appinfo->zipExeRegex.isEmpty())
+	{
+	    int i = list.indexOf(m_appinfo->zipExeRegex);
+	    if(i>-1)
+	    {
+		m_appinfo->fileName = list[i];
+		return true;
+	    }
+	}
+    }
+
+    int answer=-1;
+    emit askUserToExecute(list,&answer);
+
+    if(answer>-1)
+    {
+	m_appinfo->fileName = list[answer];
+	return true;
+    }
+    emit progress(this,0,"install caneled by user");
+    return false;
+}
+
+
 bool task_t::install()
 {
     QProcess proc;
     QStringList args;
+
+
+    if(m_appinfo->fileName.endsWith(".zip"))
+    {
+	if(!unzip())
+	{
+	    return false;
+	}
+    }
+
+
     QString launchCommand = m_appinfo->Path + "/" + m_appinfo->fileName;
     if(m_appinfo->isFlagSet(appinfo_t::ADMIN))
     {
@@ -419,6 +516,8 @@ bool task_t::install()
 
     while(!proc.waitForFinished(0) && proc.error()==QProcess::Timedout)
     {
+	if(should_quit)
+	    break;
         if((!m_appinfo->install_lastProcessName.isEmpty()) && launchCommand.contains(m_appinfo->install_lastProcessName))
         {
             QThread::msleep(500);
@@ -429,13 +528,16 @@ bool task_t::install()
         }
     }
 
-    if(proc.state()==QProcess::Running && !proc.waitForFinished(-1) )
+    if(!should_quit)
     {
-        if(m_appinfo->isFlagSet(appinfo_t::ADMIN))
-            unSetRunAsAdmin(launchCommand);
+	if(proc.state()==QProcess::Running && !proc.waitForFinished(-1) )
+	{
+	    if(m_appinfo->isFlagSet(appinfo_t::ADMIN))
+		unSetRunAsAdmin(launchCommand);
 
-        emit progress(this,0,proc.errorString());
-        return false;
+	    emit progress(this,0,proc.errorString());
+	    return false;
+	}
     }
 
     if(m_appinfo->isFlagSet(appinfo_t::ADMIN))
@@ -454,7 +556,7 @@ bool task_t::install()
 
         if(m_appinfo->newerVersionAvailable())
         {
-            emit progress(this,0,"install failed, wrong version - if the latest version is installed, right click and select:'force tolatest'");
+            emit progress(this,0,"install failed: wrong version - if the latest version is installed, right click and select:'force to latest'");
             return false;
         }
 
@@ -567,6 +669,7 @@ bool task_t::download()
                         emit progress(this,100,"Downloaded: "+filename);
 
                         m_appinfo->fileName = filename;
+			m_appinfo->DlVersion = m_appinfo->LatestVersion;
                         m_appinfo->setFlag(appinfo_t::DOWNLOADED);
                         m_appinfo->unSetFlag(appinfo_t::ONLY_INFO);
                         if(!isSet(INSTALL))

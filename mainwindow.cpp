@@ -5,6 +5,10 @@
 #include <QMetaType>
 #include <QCloseEvent>
 #include <QDesktopWidget>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QString>
+#include <QFile>
 #include "settingsdialog.h"
 #include "choosedialog.h"
 #include <applist_t.h>
@@ -36,6 +40,9 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(act,SIGNAL(triggered()),SLOT(show()));
     connect(act,SIGNAL(triggered()),SLOT(raise()));
     connect(act,SIGNAL(triggered()),&timer_update,SLOT(stop()));
+    QAction *action = menu->addAction("Get latest version");
+    action->setVisible(false);
+    connect(action,SIGNAL(triggered()),&updater,SLOT(download()));
     connect(trayicon,SIGNAL(activated(QSystemTrayIcon::ActivationReason)),SLOT(trayContextMenuFix()));
 
     trayicon->show();
@@ -45,7 +52,21 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(ui->Page1Applist,SIGNAL(status(QString)),SLOT(setStatus(QString)));
 
+    connect(ui->Page1Applist,SIGNAL(reload_clicked()),SLOT(onReload()));
+
     QTimer::singleShot(60*1000,this,SLOT(resetTaskBarIcon()));
+
+    QFile checkPortable("portableUpdater.bat");
+    if(checkPortable.exists())
+    {
+        if(SettingsDialog::shouldCheckVersions())
+            updater.activate();
+    }else
+        ui->actionCheck_for_update->deleteLater();
+
+    connect(&updater,SIGNAL(newer_version_available()),SLOT(showNewVersionAvailable()));
+    connect(&updater,SIGNAL(no_new_version(QString)),SLOT(showNoNewVersionAvailable(QString)));
+    showMessageBox = false;
 }
 
 MainWindow::~MainWindow()
@@ -114,6 +135,12 @@ void MainWindow::closeEvent(QCloseEvent *evt)
                 evt->ignore();
             if(ans == QMessageBox::Yes)
             {
+		if(!ui->Page2TaskList->isEmpty())
+		{
+		    QMessageBox::warning(this,"Can't close","There are still running tasks in the tasklist!");
+		    evt->ignore();
+		    return;
+		}
                 evt->accept();
                 QApplication::quit();
             }
@@ -138,6 +165,12 @@ void MainWindow::closeEvent(QCloseEvent *evt)
         }
     }else
     {
+	if(!ui->Page2TaskList->isEmpty())
+	{
+	    QMessageBox::warning(this,"Can't close","There are still running tasks in the tasklist!");
+	    evt->ignore();
+	    return;
+	}
         evt->accept();
         QApplication::quit();
     }
@@ -146,7 +179,7 @@ void MainWindow::closeEvent(QCloseEvent *evt)
 
 void MainWindow::on_actionQuit_triggered()
 {
-    QApplication::quit();
+    close();
 }
 
 void MainWindow::on_actionSettings_triggered()
@@ -159,9 +192,8 @@ void MainWindow::on_actionAbout_triggered()
 {
     QMessageBox aboutmsg;
     aboutmsg.setIconPixmap(QPixmap(":icons/WinApp_Manager.ico"));
-    QDate buildDate = QLocale(QLocale::C).toDate(QString(__DATE__).simplified(), QLatin1String("MMM d yyyy"));
     QString about;
-    about = tr("<h3>WinApp_Manager - %1</h3>\n").arg(buildDate.toString("yy.M.d")) +
+    about = tr("<h3>WinApp_Manager - %1</h3>\n").arg(SettingsDialog::currentVersion()) +
 	    "WinApp_Manager is a free program. We are grateful to SourceForge.net for our project hosting.\nThis Program is available for Windows 98 and later.\n If you want to help keeping the information up to date just go to our homepage and do it :"+
             "\n\n<h3>Licence:</h3>GPL\n"+
 	    "<h3>Website:</h3> <a href=\"http://appdriverupdate.sourceforge.net/\">http://appdriverupdate.sourceforge.net</a>";
@@ -175,10 +207,45 @@ void MainWindow::on_actionAboutQt_triggered()
     QMessageBox::aboutQt(this,"aboutQt");
 }
 
-void MainWindow::on_actionReload_triggered()
+void MainWindow::onReload()
 {
     if(ui->Page2TaskList->isEmpty())
         ui->Page1Applist->loadList();
     else
-        QMessageBox::information(this,"Unable to reload","Can't reload list while there are running or pending tasks!");
+        QMessageBox::information(this,"Unable to reload","Can't reload list while there are running tasks!");
+}
+
+
+void MainWindow::on_actionRequest_Software_Support_triggered()
+{
+    QDesktopServices::openUrl(QString("http://appdriverupdate.sourceforge.net/requests/RequestApps.php"));
+}
+
+void MainWindow::on_actionCheck_for_update_triggered()
+{
+    showMessageBox = true;
+    updater.check();
+}
+
+void MainWindow::showNewVersionAvailable()
+{
+    trayicon->contextMenu()->actions().last()->setVisible(true);
+    if(showMessageBox)
+    {
+        int answer = QMessageBox::information(this,"New version available","A new version of Winapp_Manager portable is available. Download now?\n You can also click 'Get latest version' in the icontray context-menu to download the new version",QMessageBox::Yes|QMessageBox::No);
+        if(answer==QMessageBox::Yes)
+            updater.download();
+        showMessageBox = false;
+    }else
+        trayicon->showMessage("New Version Available!","A new version of winapp_manager is available.\n To download click 'Get latest version' in the icontray context-menu");
+}
+
+
+void MainWindow::showNoNewVersionAvailable(QString message)
+{
+    if(showMessageBox)
+    {
+        QMessageBox::information(this,"No newer version available",message);
+        showMessageBox = false;
+    }
 }

@@ -47,7 +47,6 @@ private slots:
     void ondownloadFinished(QNetworkReply *reply);
     void onNewFileInfo();
     void onAppListDownloaded();
-    void onCategoryTreeDownloaded();
     void onProgress(qint64 rec,qint64 tot);
 };
 

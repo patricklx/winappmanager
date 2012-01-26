@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>368</width>
-    <height>349</height>
+    <width>384</width>
+    <height>288</height>
    </rect>
   </property>
   <property name="palette">
@@ -96,7 +96,7 @@
       <enum>QTabWidget::Rounded</enum>
      </property>
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tab">
       <attribute name="title">
@@ -137,77 +137,6 @@
         </widget>
        </item>
        <item>
-        <widget class="QCheckBox" name="ckShowAllApps">
-         <property name="text">
-          <string>show all installed applications</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout">
-         <item>
-          <widget class="QGroupBox" name="groupBox_3">
-           <property name="title">
-            <string>Upgrade Mode</string>
-           </property>
-           <layout class="QVBoxLayout" name="verticalLayout_3">
-            <item>
-             <widget class="QRadioButton" name="checkUpgradeAsk">
-              <property name="text">
-               <string>Ask</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QRadioButton" name="checkSilentUpgrade">
-              <property name="text">
-               <string>Silent</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QRadioButton" name="checkAttendedUpgrade">
-              <property name="text">
-               <string>Attended</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <widget class="QGroupBox" name="groupBox">
-           <property name="title">
-            <string>Install Mode</string>
-           </property>
-           <layout class="QVBoxLayout" name="verticalLayout_4">
-            <item>
-             <widget class="QRadioButton" name="checkAskInstall">
-              <property name="text">
-               <string>Ask</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QRadioButton" name="checkSilentInstall">
-              <property name="text">
-               <string>Silent</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QRadioButton" name="checkAttendeInstall">
-              <property name="text">
-               <string>Attended</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
         <widget class="QGroupBox" name="groupBox_2">
          <property name="title">
           <string>On Closing window</string>
@@ -236,6 +165,127 @@
           </item>
          </layout>
         </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_4">
+      <attribute name="title">
+       <string>Software</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_3">
+       <item>
+        <widget class="QCheckBox" name="ckShowAllApps">
+         <property name="text">
+          <string>show all installed applications</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout">
+         <item>
+          <widget class="QGroupBox" name="groupBox">
+           <property name="title">
+            <string>Install Mode</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_11">
+            <item>
+             <widget class="QRadioButton" name="checkAskInstall">
+              <property name="text">
+               <string>Ask</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="checkSilentInstall">
+              <property name="text">
+               <string>Silent</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="checkAttendeInstall">
+              <property name="text">
+               <string>Attended</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_6">
+           <property name="title">
+            <string>Upgrade Mode</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_4">
+            <item>
+             <widget class="QRadioButton" name="checkUpgradeAsk">
+              <property name="text">
+               <string>Ask</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="checkSilentUpgrade">
+              <property name="text">
+               <string>Silent</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="checkAttendedUpgrade">
+              <property name="text">
+               <string>Attended</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_7">
+           <property name="title">
+            <string>Uninstall Mode</string>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayout_9">
+            <item>
+             <widget class="QRadioButton" name="checkUninstallAsk">
+              <property name="text">
+               <string>Ask</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="checkSilentUninstall">
+              <property name="text">
+               <string>Silent</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QRadioButton" name="checkAttendedUninstall">
+              <property name="text">
+               <string>Attended</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_5">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>
@@ -515,13 +565,6 @@
   <tabstop>tabWidget</tabstop>
   <tabstop>checklatestversion</tabstop>
   <tabstop>checkstartwithsystem</tabstop>
-  <tabstop>ckShowAllApps</tabstop>
-  <tabstop>checkUpgradeAsk</tabstop>
-  <tabstop>checkSilentUpgrade</tabstop>
-  <tabstop>checkAttendedUpgrade</tabstop>
-  <tabstop>checkAskInstall</tabstop>
-  <tabstop>checkSilentInstall</tabstop>
-  <tabstop>checkAttendeInstall</tabstop>
   <tabstop>checkAskClose</tabstop>
   <tabstop>checkCloseClsoe</tabstop>
   <tabstop>checkCloseMinimize</tabstop>

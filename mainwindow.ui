@@ -524,13 +524,13 @@
      <string>Main</string>
     </property>
     <addaction name="actionQuit"/>
-    <addaction name="actionReload"/>
    </widget>
    <widget class="QMenu" name="menuTools">
     <property name="title">
      <string>Tools</string>
     </property>
     <addaction name="actionSettings"/>
+    <addaction name="actionRequest_Software_Support"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -538,6 +538,7 @@
     </property>
     <addaction name="actionAbout"/>
     <addaction name="actionAboutQt"/>
+    <addaction name="actionCheck_for_update"/>
    </widget>
    <addaction name="menuMain"/>
    <addaction name="menuTools"/>
@@ -563,9 +564,14 @@
     <string>AboutQt</string>
    </property>
   </action>
-  <action name="actionReload">
+  <action name="actionRequest_Software_Support">
    <property name="text">
-    <string>Reload</string>
+    <string>Request Software Support</string>
+   </property>
+  </action>
+  <action name="actionCheck_for_update">
+   <property name="text">
+    <string>Check for update</string>
    </property>
   </action>
  </widget>

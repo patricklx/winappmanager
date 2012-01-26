@@ -35,6 +35,7 @@ private slots:
     void onTaskFinished();
     void onSilentTaskFinished();
     void onDownloadFinished();
+    void userChooseExecutable(QStringList list,int* answer);
 
 private:
     Ui::tasklist_t *ui;

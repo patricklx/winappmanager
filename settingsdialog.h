@@ -38,6 +38,7 @@ public:
     static QDate lastInfoUpdate();
     static void setLastInfoUpdate(QDate date);
 
+    static int getUninstallMode();
     static int getInstallMode();
     static int getUpgradeMode();
     static int getCloseMode();
@@ -61,6 +62,8 @@ public:
 
     static bool updatedToLatestVersion();
     static void setUpdatedToLatestVersion();
+
+    static QString currentVersion();
 
 private slots:
     void on_btApply_clicked();

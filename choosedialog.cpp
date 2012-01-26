@@ -28,6 +28,14 @@ ChooseDialog::ChooseDialog(appinfo_t *info,QWidget *parent) :
             ui->checkSilent->setChecked(true);
     }
 
+    if(info->isFlagSet(appinfo_t::NO_REGISTRY) || !info->isFlagSet(appinfo_t::WIN_VERSION_OK))
+    {
+        ui->checkInstall->setChecked(false);
+        ui->checkInstall->setDisabled(true);
+        ui->checkSilent->setDisabled(true);
+        ui->checkSilent->setChecked(false);
+    }
+
     for(int i=0;i<info->inet_files.count();i++)
     {
         ui->listWidget->addItem(info->inet_files[i].description);

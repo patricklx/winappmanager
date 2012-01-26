@@ -43,6 +43,7 @@ signals:
     void unSelected(appinfo_t *info);
     void versions_available();
     void status(QString text);
+    void reload_clicked();
 
 private slots:
     void on_TCategoryTree_itemSelectionChanged();
@@ -61,6 +62,8 @@ private slots:
 
     void setRegistryInfo(registry_group_t group);
 
+    void on_btReload_clicked();
+
 public slots:
     void onRemovedFromTasks(appinfo_t *info);
     void updateItem(appinfo_t *appinfo);
@@ -70,12 +73,15 @@ public slots:
 
 private:
     Ui::applist_t *ui;
+    bool searching;
+    bool stop_searching;
     QList<fileinfo_t> fileinfo_list;
     QList<fileinfo_t> noinfo_list;
     bool info_updates_avail;
     void appendToList(fileinfo_t &fileinfo);
     void saveList();
     void loadCategoryTree(QDomElement node,QTreeWidgetItem *item);
+    void addCategory(QStringList categorylist);
 
     void clear();
 

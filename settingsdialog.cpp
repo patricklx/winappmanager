@@ -37,6 +37,20 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
         ui->checkSilentInstall->setChecked(true);
         break;
     }
+
+    switch(getUninstallMode())
+    {
+    case ASK:
+	ui->checkUninstallAsk->setChecked(true);
+	break;
+    case ATTENDED:
+	ui->checkAttendedUninstall->setChecked(true);
+	break;
+    case SILENT:
+	ui->checkSilentUninstall->setChecked(true);
+	break;
+    }
+
     switch(getUpgradeMode())
     {
     case ASK:
@@ -96,6 +110,7 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     ui->proxy_username->setText( settings->value("PROXY_USERNAME").toString() );
     ui->proxy_port->setText( settings->value("PROXY_PORT").toString() );
     ui->proxy_password->setText( settings->value("PROXY_PASSWORD").toString());
+
 }
 
 SettingsDialog::~SettingsDialog()
@@ -117,13 +132,19 @@ void SettingsDialog::on_btApply_clicked()
         QMessageBox::information(this,"Setting Start With System","Failed to add/remove Winapp_manager to/from the startup!\n retry as admin");
     }
 
-
     if( ui->checkAskInstall->isChecked() )
         settings->setValue("INSTALL_MODE",ASK);
     if( ui->checkAttendeInstall->isChecked() )
         settings->setValue("INSTALL_MODE",ATTENDED);
     if( ui->checkSilentInstall->isChecked() )
         settings->setValue("INSTALL_MODE",SILENT);
+
+    if( ui->checkUninstallAsk->isChecked() )
+	settings->setValue("UNINSTALL_MODE",ASK);
+    if( ui->checkAttendedUninstall->isChecked() )
+	settings->setValue("UNINSTALL_MODE",ATTENDED);
+    if( ui->checkSilentUninstall->isChecked() )
+	settings->setValue("UNINSTALL_MODE",SILENT);
 
     if( ui->checkUpgradeAsk->isChecked() )
         settings->setValue("UPGRADE_MODE",ASK);
@@ -298,6 +319,11 @@ void SettingsDialog::setLastVersionUpdate(QDate date)
     settings->setValue("LAST_VERSION_CHECK",date);
 }
 
+int SettingsDialog::getUninstallMode()
+{
+    return settings->value("UNINSTALL_MODE").toInt();
+}
+
 int SettingsDialog::getInstallMode()
 {
     return settings->value("INSTALL_MODE").toInt();
@@ -336,5 +362,12 @@ QPoint SettingsDialog::screenCenter()
     pos = monitor->availableGeometry(desktop).center();
     return pos;
 }
+
+QString SettingsDialog::currentVersion()
+{
+    QDate buildDate = QLocale(QLocale::C).toDate(QString(__DATE__).simplified(), QLatin1String("MMM d yyyy"));
+    return buildDate.toString("yy.MM.d");
+}
+
 
 
