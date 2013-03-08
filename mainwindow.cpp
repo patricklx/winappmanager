@@ -11,7 +11,7 @@
 #include <QFile>
 #include "settingsdialog.h"
 #include "choosedialog.h"
-#include <applist_t.h>
+#include <applist.h>
 
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -21,10 +21,6 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     move(SettingsDialog::screenCenter()-rect().bottomRight()/2);
 
-    connect(ui->Page1Applist,SIGNAL(taskChosen(task_t*)),ui->Page2TaskList,SLOT(addTask(task_t*)));
-    connect(ui->Page1Applist,SIGNAL(unSelected(appinfo_t*)),ui->Page2TaskList,SLOT(removeTask(appinfo_t*)));
-    connect(ui->Page2TaskList,SIGNAL(onTaskRemoved(appinfo_t*)),ui->Page1Applist,SLOT(onRemovedFromTasks(appinfo_t*)));
-    connect(ui->Page2TaskList,SIGNAL(updateAppInfo(appinfo_t*)),ui->Page1Applist,SLOT(updateItem(appinfo_t*)));
     timer_update.setInterval(1000*60*60*2);//check every 2 hour
     connect(&timer_update,SIGNAL(timeout()),SLOT(timerEvent()));
 
@@ -48,18 +44,16 @@ MainWindow::MainWindow(QWidget *parent) :
     trayicon->show();
     trayicon->setContextMenu(menu);
 
-    connect(ui->Page1Applist,SIGNAL(versions_available()),SLOT(newVersionMessage()));
+    connect(ui->mainWidget,SIGNAL(versions_available()),SLOT(newVersionMessage()));
 
-    connect(ui->Page1Applist,SIGNAL(status(QString)),SLOT(setStatus(QString)));
-
-    connect(ui->Page1Applist,SIGNAL(reload_clicked()),SLOT(onReload()));
+    connect(ui->mainWidget,SIGNAL(status(QString)),SLOT(setStatus(QString)));
 
     QTimer::singleShot(60*1000,this,SLOT(resetTaskBarIcon()));
 
     QFile checkPortable("portableUpdater.bat");
     if(checkPortable.exists())
     {
-        if(SettingsDialog::shouldCheckVersions())
+        if(SettingsDialog::value<bool>(SettingsDialog::CheckWinappManagerVersion))
             updater.activate();
     }else
         ui->actionCheck_for_update->deleteLater();
@@ -103,7 +97,7 @@ void MainWindow::onTrayDoubleClicked(QSystemTrayIcon::ActivationReason reason)
 
 void MainWindow::setStatus(QString text)
 {
-
+    Q_UNUSED(text)
 }
 
 
@@ -111,21 +105,20 @@ void MainWindow::newVersionMessage()
 {
     if(!this->isVisible())
     {
-        if(ui->Page1Applist->version_updates_avail)
-            trayicon->showMessage("New versions","There are new versions available for download");
+        trayicon->showMessage("New versions","There are new versions available for download");
     }
 }
 
 void MainWindow::timerEvent()
 {
-    ui->Page1Applist->on_btUpdate_clicked();
+    ui->mainWidget->updateVersions();
 }
 
 void MainWindow::closeEvent(QCloseEvent *evt)
 {
     if(evt->spontaneous())
     {
-        if( SettingsDialog::getCloseMode() == SettingsDialog::ASK )
+        if( SettingsDialog::value<int>(SettingsDialog::CloseMode) == SettingsDialog::Ask )
         {
             int ans = QMessageBox::information(this,"Closing Winapp_Manager",
                                                "Close Winapp_Manager?\n If not, Winapp_Manager will minimize to tray and check every hour for updates",
@@ -135,12 +128,12 @@ void MainWindow::closeEvent(QCloseEvent *evt)
                 evt->ignore();
             if(ans == QMessageBox::Yes)
             {
-		if(!ui->Page2TaskList->isEmpty())
-		{
-		    QMessageBox::warning(this,"Can't close","There are still running tasks in the tasklist!");
-		    evt->ignore();
-		    return;
-		}
+                if(ui->mainWidget->tasksRunning())
+                {
+                    QMessageBox::warning(this,"Can't close","There are still running tasks in the tasklist!");
+                    evt->ignore();
+                    return;
+                }
                 evt->accept();
                 QApplication::quit();
             }
@@ -151,26 +144,26 @@ void MainWindow::closeEvent(QCloseEvent *evt)
                 timer_update.start();
             }
         }
-        if( SettingsDialog::getCloseMode() == SettingsDialog::MINIMIZE )
+        if( SettingsDialog::value<int>(SettingsDialog::CloseMode) == SettingsDialog::Minimize )
         {
             evt->ignore();
             this->hide();
             timer_update.start();
         }
 
-        if( SettingsDialog::getCloseMode() == SettingsDialog::CLOSE )
+        if( SettingsDialog::value<int>(SettingsDialog::CloseMode) == SettingsDialog::Close )
         {
             evt->accept();
             QApplication::quit();
         }
     }else
     {
-	if(!ui->Page2TaskList->isEmpty())
-	{
-	    QMessageBox::warning(this,"Can't close","There are still running tasks in the tasklist!");
-	    evt->ignore();
-	    return;
-	}
+        if(ui->mainWidget->tasksRunning())
+        {
+            QMessageBox::warning(this,"Can't close","There are still running tasks in the tasklist!");
+            evt->ignore();
+            return;
+        }
         evt->accept();
         QApplication::quit();
     }
@@ -194,9 +187,9 @@ void MainWindow::on_actionAbout_triggered()
     aboutmsg.setIconPixmap(QPixmap(":icons/WinApp_Manager.ico"));
     QString about;
     about = tr("<h3>WinApp_Manager - %1</h3>\n").arg(SettingsDialog::currentVersion()) +
-	    "WinApp_Manager is a free program. We are grateful to SourceForge.net for our project hosting.\nThis Program is available for Windows 98 and later.\n If you want to help keeping the information up to date just go to our homepage and do it :"+
+            "WinApp_Manager is a free program. We are grateful to SourceForge.net for our project hosting.\nThis Program is available for Windows 98 and later.\n If you want to help keeping the information up to date just go to our homepage and do it :"+
             "\n\n<h3>Licence:</h3>GPL\n"+
-	    "<h3>Website:</h3> <a href=\"http://appdriverupdate.sourceforge.net/\">http://appdriverupdate.sourceforge.net</a>";
+            "<h3>Website:</h3> <a href=\"https://winappmanager-patrick.dotcloud.com/\">https://winappmanager-patrick.dotcloud.com</a>";
     aboutmsg.setText(about);
     aboutmsg.exec();
 
@@ -207,18 +200,9 @@ void MainWindow::on_actionAboutQt_triggered()
     QMessageBox::aboutQt(this,"aboutQt");
 }
 
-void MainWindow::onReload()
-{
-    if(ui->Page2TaskList->isEmpty())
-        ui->Page1Applist->loadList();
-    else
-        QMessageBox::information(this,"Unable to reload","Can't reload list while there are running tasks!");
-}
-
-
 void MainWindow::on_actionRequest_Software_Support_triggered()
 {
-    QDesktopServices::openUrl(QString("http://appdriverupdate.sourceforge.net/requests/RequestApps.php"));
+    QDesktopServices::openUrl(QString("https://winappmanager-patrick.dotcloud.com/request/"));
 }
 
 void MainWindow::on_actionCheck_for_update_triggered()

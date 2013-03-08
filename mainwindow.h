@@ -6,7 +6,7 @@
 #include <QListWidgetItem>
 #include <QTreeWidgetItem>
 #include <QSystemTrayIcon>
-#include "tasklist_t.h"
+#include "tasklist.h"
 #include "winapp_manager_updater.h"
 
 namespace Ui {
@@ -25,7 +25,7 @@ private:
     Ui::MainWindow *ui;
     QTimer timer_update;
     QSystemTrayIcon *trayicon;
-    winapp_manager_updater updater;
+    WinappManagerUpdater updater;
     bool showMessageBox;
 
 private slots:
@@ -41,8 +41,6 @@ private slots:
     void onTrayDoubleClicked(QSystemTrayIcon::ActivationReason reason = QSystemTrayIcon::DoubleClick);
     void newVersionMessage();
     void resetTaskBarIcon();
-
-    void onReload();
 
     void on_actionRequest_Software_Support_triggered();
 

@@ -1,18 +1,28 @@
 
-#include <QtGui/QApplication>
+#include <QtGui/QGuiApplication>
 #include "mainwindow.h"
 #include "settingsdialog.h"
 #include <qplugin.h>
 #include <QDir>
 #include <QString>
+#include <QDebug>
+#include <qplatformdefs.h>
+#include <QStandardPaths>
+#include "utils/qstringext.h"
+#include <iostream>
+#include <string>
+#include <list>
+#include <windows.h>
+#include "yaml-cpp/yaml.h"
 
 #if defined(QT_NO_DEBUG)
-Q_IMPORT_PLUGIN(qico)
+Q_IMPORT_PLUGIN(QICOPlugin)
 #endif
 
 
-void myMessageHandler(QtMsgType type, const char *msg)
+void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
+    Q_UNUSED(context)
     QString txt;
     switch (type) {
         case QtDebugMsg:
@@ -35,11 +45,13 @@ void myMessageHandler(QtMsgType type, const char *msg)
     ts << txt << endl;
 }
 
+
 int main(int argc, char *argv[])
 {
-    QDir::setCurrent(QString(argv[0]).beforeLast('\\'));
+    QDir::setCurrent(QStringExt(argv[0]).beforeLast('\\'));
     QApplication a(argc, argv);
-
+    QCoreApplication::setApplicationName("WinAppManager");
+    //QApplication::setStyle("Fusion");
 
     QStringList cmdline_args = a.arguments();
     if( cmdline_args.contains("debug") )
@@ -47,15 +59,16 @@ int main(int argc, char *argv[])
         QFile outFile("log.txt");
         outFile.remove();
         qDebug("setting qMsgHandler");
-        qInstallMsgHandler(myMessageHandler);
+        qInstallMessageHandler(myMessageHandler);
         qDebug("qMsgHandler set");
     }
 
     a.setQuitOnLastWindowClosed(false);
     SettingsDialog::loadSettings();
 
+
     MainWindow w;
-    if(!(argc>0 && QString(argv[1])==QString("hidden")))
+    if(!(argc>1 && QString(argv[1])==QString("hidden")))
     {
         w.show();
     }
@@ -64,6 +77,7 @@ int main(int argc, char *argv[])
     SettingsDialog::unLoadSettings();
     return ret;
 }
+
 
 /*
 
@@ -79,53 +93,5 @@ int main(int argc, char *argv[])
     void writeAttribute(const QString &qualifiedName,QVariant value)
     {
         writeAttribute(qualifiedName,value.toString());
-    }
-
-changes made to qstring.h:
-
-    QString afterLast(QChar word)
-    {
-        int index = lastIndexOf(word)+1;
-        return right(size()-index);
-    }
-
-    QString afterLast(QString word)
-    {
-        int index = lastIndexOf(word)+word.length();
-        return right(size()-index);
-    }
-
-    QString beforeLast(QChar word)
-    {
-        int index = lastIndexOf(word);
-        return left(index);
-    }
-
-    QString beforeLast(QString word)
-    {
-        int index = lastIndexOf(word);
-        return left(index);
-    }
-
-    QString afterFirst(QString word)
-    {
-        int index = indexOf(word)+word.length();
-        return right(size()-index);
-    }
-    QString afterFirst(QChar word)
-    {
-        int index = indexOf(word)+1;
-        return right(size()-index);
-    }
-
-    QString beforeFirst(QString word)
-    {
-        int index = indexOf(word);
-        return left(index);
-    }
-    QString beforeFirst(QChar word)
-    {
-        int index = indexOf(word);
-        return left(index);
     }
 */

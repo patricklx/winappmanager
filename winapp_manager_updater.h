@@ -11,7 +11,7 @@
 #include <QDialog>
 #include "ui_updaterdialog.h"
 
-class winapp_manager_updater : public QDialog
+class WinappManagerUpdater : public QDialog
 {
         Q_OBJECT
         QString latest_version;
@@ -23,8 +23,8 @@ class winapp_manager_updater : public QDialog
         QTimer update_timer;
         Ui_UpdaterDialog *ui;
     public:
-        winapp_manager_updater();
-        ~winapp_manager_updater();
+        WinappManagerUpdater();
+        ~WinappManagerUpdater();
 
         void activate();
 

@@ -4,11 +4,16 @@
 #include <QDir>
 #include <QNetworkProxy>
 #include <QDesktopWidget>
+#include <QStandardPaths>
+#include <QDesktopServices>
+#include <QCoreApplication>
+#include <QFileDialog>
 #include "settingsdialog.h"
 #include "ui_settingsdialog.h"
 
-QSettings *settings;
-
+QSettings *SettingsDialog::settings=NULL;
+QMap<int,QString> SettingsDialog::settingNames = QMap<int,QString>();
+QMap<int,QVariant> SettingsDialog::settingsDefaults = QMap<int,QVariant>();
 
 SettingsDialog::SettingsDialog(QWidget *parent) :
     QDialog(parent),
@@ -16,81 +21,85 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    qDebug()<<"application name: "<<QCoreApplication::applicationName();
+
     move(SettingsDialog::screenCenter()-rect().bottomRight()/2);
 
-    ui->checklatestversion->setChecked(shouldCheckVersions());
-    ui->checkupdates->setChecked(shouldCheckAppInfo());
+    ui->checklatestversion->setChecked(value<bool>(CheckWinappManagerVersion));
+    ui->checkupdates->setChecked(value<bool>(CheckInfo));
     ui->checkstartwithsystem->setChecked(startsWithSystem());
-    ui->maxtaskCount->setValue(simulDownloadCount());
-    ui->ckShowAllApps->setChecked(showAllApps());
-    ui->ckdlPackage->setChecked(isSetDownloadPackages());
+    ui->maxtaskCount->setValue(value<int>(MaxDownloads));
+    ui->ckShowAllApps->setChecked(value<bool>(ShowAllApps));
+    ui->ckdlPackage->setChecked(value<bool>(DlPackages));
+    ui->saveDownloadedCheck->setChecked(value<bool>(SaveDownloaded));
 
-    switch(getInstallMode())
+
+    switch(value<int>(InstallMode))
     {
-    case ASK:
+    case Ask:
         ui->checkAskInstall->setChecked(true);
         break;
-    case ATTENDED:
+    case Attended:
         ui->checkAttendeInstall->setChecked(true);
         break;
-    case SILENT:
+    case Silent:
         ui->checkSilentInstall->setChecked(true);
         break;
     }
 
-    switch(getUninstallMode())
+    switch(value<int>(UninstallMode))
     {
-    case ASK:
-	ui->checkUninstallAsk->setChecked(true);
-	break;
-    case ATTENDED:
-	ui->checkAttendedUninstall->setChecked(true);
-	break;
-    case SILENT:
-	ui->checkSilentUninstall->setChecked(true);
-	break;
+    case Ask:
+        ui->checkUninstallAsk->setChecked(true);
+        break;
+    case Attended:
+        ui->checkAttendedUninstall->setChecked(true);
+        break;
+    case Silent:
+        ui->checkSilentUninstall->setChecked(true);
+        break;
     }
 
-    switch(getUpgradeMode())
+    switch(value<int>(UpgradeMode))
     {
-    case ASK:
+    case Ask:
         ui->checkUpgradeAsk->setChecked(true);
         break;
-    case ATTENDED:
+    case Attended:
         ui->checkAttendedUpgrade->setChecked(true);
         break;
-    case SILENT:
+    case Silent:
         ui->checkSilentUpgrade->setChecked(true);
         break;
     }
 
-    switch(getCloseMode())
+    switch(value<int>(CloseMode))
     {
-    case ASK:
+    case Ask:
         ui->checkAskClose->setChecked(true);
         break;
-    case CLOSE:
+    case Close:
         ui->checkCloseClsoe->setChecked(true);
         break;
-    case MINIMIZE:
+    case Minimize:
         ui->checkCloseMinimize->setChecked(true);
         break;
     }
 
-    switch(getInstallTaskMode())
+    switch(value<int>(InstallTaskMode))
     {
-    case ATTENDED:
+    case Attended:
         ui->installmodeAttended->setChecked(true);
         break;
-    case SILENT:
+    case Silent:
         ui->installModeSilent->setChecked(true);
         break;
     }
 
-    if(proxyEnabled())
+    if(value<bool>(ProxyEnabled))
         ui->proxy_settings->setChecked(true);
 
-    switch(settings->value("PROXY_TYPE").toInt())
+    switch(value<int>(ProxyType))
     {
     case QNetworkProxy::Socks5Proxy:
         ui->proxy_type->setCurrentIndex(0);
@@ -127,43 +136,45 @@ void SettingsDialog::on_btApply_clicked()
     settings->setValue("SHOW_ALL_APPS",ui->ckShowAllApps->isChecked());
     settings->setValue("DL_PACKAGES",ui->ckdlPackage->isChecked());
 
+    setValue(SaveDownloaded,ui->saveDownloadedCheck->isChecked());
+
     if( !setStartWithSystem(ui->checkstartwithsystem->isChecked()) )
     {
         QMessageBox::information(this,"Setting Start With System","Failed to add/remove Winapp_manager to/from the startup!\n retry as admin");
     }
 
     if( ui->checkAskInstall->isChecked() )
-        settings->setValue("INSTALL_MODE",ASK);
+        settings->setValue("INSTALL_MODE",Ask);
     if( ui->checkAttendeInstall->isChecked() )
-        settings->setValue("INSTALL_MODE",ATTENDED);
+        settings->setValue("INSTALL_MODE",Attended);
     if( ui->checkSilentInstall->isChecked() )
-        settings->setValue("INSTALL_MODE",SILENT);
+        settings->setValue("INSTALL_MODE",Silent);
 
     if( ui->checkUninstallAsk->isChecked() )
-	settings->setValue("UNINSTALL_MODE",ASK);
+        settings->setValue("UNINSTALL_MODE",Ask);
     if( ui->checkAttendedUninstall->isChecked() )
-	settings->setValue("UNINSTALL_MODE",ATTENDED);
+        settings->setValue("UNINSTALL_MODE",Attended);
     if( ui->checkSilentUninstall->isChecked() )
-	settings->setValue("UNINSTALL_MODE",SILENT);
+        settings->setValue("UNINSTALL_MODE",Silent);
 
     if( ui->checkUpgradeAsk->isChecked() )
-        settings->setValue("UPGRADE_MODE",ASK);
+        settings->setValue("UPGRADE_MODE",Ask);
     if( ui->checkAttendedUpgrade->isChecked() )
-        settings->setValue("UPGRADE_MODE",ATTENDED);
+        settings->setValue("UPGRADE_MODE",Attended);
     if( ui->checkSilentUpgrade->isChecked() )
-        settings->setValue("UPGRADE_MODE",SILENT);
+        settings->setValue("UPGRADE_MODE",Silent);
 
     if( ui->checkAskClose->isChecked() )
-        settings->setValue("CLOSE_MODE",ASK);
+        settings->setValue("CLOSE_MODE",Ask);
     if( ui->checkCloseClsoe->isChecked() )
-        settings->setValue("CLOSE_MODE",CLOSE);
+        settings->setValue("CLOSE_MODE",Close);
     if( ui->checkCloseMinimize->isChecked() )
-        settings->setValue("CLOSE_MODE",MINIMIZE);
+        settings->setValue("CLOSE_MODE",Minimize);
 
     if( ui->installmodeAttended->isChecked() )
-        settings->setValue("INSTALL_TASK_MODE",ATTENDED);
+        settings->setValue("INSTALL_TASK_MODE",Attended);
     if( ui->installModeSilent->isChecked() )
-        settings->setValue("INSTALL_TASK_MODE",SILENT);
+        settings->setValue("INSTALL_TASK_MODE",Silent);
 
     if( ui->proxy_settings->isChecked() )
     {
@@ -199,19 +210,13 @@ void SettingsDialog::on_btApply_clicked()
 }
 
 
-bool SettingsDialog::showAllApps()
+void SettingsDialog::setNetworkProxy()
 {
-    return settings->value("SHOW_ALL_APPS","true").toBool();
-}
-
-bool SettingsDialog::proxyEnabled()
-{
-    return settings->value("PROXY_ENABLED",false).toBool();
-}
-
-bool SettingsDialog::isSetDownloadPackages()
-{
-    return settings->value("DL_PACKAGES",true).toBool();
+    if(value<bool>(ProxyEnabled))
+    {
+        QNetworkProxy proxy = getProxySettings();
+        QNetworkProxy::setApplicationProxy(proxy);
+    }
 }
 
 QNetworkProxy SettingsDialog::getProxySettings()
@@ -227,17 +232,53 @@ QNetworkProxy SettingsDialog::getProxySettings()
 
 bool SettingsDialog::updatedToLatestVersion()
 {
-    return (settings->value("latestVersion","1.0").toString() == "2.0");
+    return (settings->value("latestVersion").toString() == "4.0");
 }
 
 
 void SettingsDialog::setUpdatedToLatestVersion()
 {
-    settings->setValue("latestVersion","2.0");
+    settings->setValue("latestVersion","4.0");
 }
 
 void SettingsDialog::loadSettings()
 {
+    settingsDefaults[CheckWinappManagerVersion]=true;
+    settingsDefaults[CheckVersions]=true;
+    settingsDefaults[CheckInfo]=true;
+    settingsDefaults[DlPackages]=true;
+    settingsDefaults[MaxDownloads]=true;
+    settingsDefaults[ShowAllApps]=true;
+    settingsDefaults[InstallMode]=Silent;
+    settingsDefaults[UninstallMode]=Silent;
+    settingsDefaults[UpgradeMode]=Silent;
+    settingsDefaults[CloseMode]=Ask;
+    settingsDefaults[InstallTaskMode]=Silent;
+    settingsDefaults[ProxyEnabled]=false;
+    settingsDefaults[ProxyType]=QNetworkProxy::DefaultProxy;
+    settingsDefaults[SaveDownloaded]=true;
+
+    settingNames[CheckWinappManagerVersion]="CHECK_WINAPP_MANAGER_VERSION";
+    settingNames[CheckVersions]="CHECK_VERSIONS";
+    settingNames[CheckInfo]="CHECK_INFO";
+    settingNames[DlPackages]="DL_PACKAGES";
+    settingNames[MaxDownloads]="DOWNLOAD_COUNT";
+    settingNames[ShowAllApps]="SHOW_ALL_APPS";
+    settingNames[InstallMode]="INSTALL_MODE";
+    settingNames[UninstallMode]="UNINSTALL_MODE";
+    settingNames[UpgradeMode]="UPGRADE_MODE";
+    settingNames[CloseMode]="CLOSE_MODE";
+    settingNames[InstallTaskMode]="INSTALL_TASK_MODE";
+    settingNames[ProxyEnabled]="PROXY_ENABLED";
+    settingNames[ProxyHostname]="PROXY_HOSTNAME";
+    settingNames[ProxyPort]="PROXY_PORT";
+    settingNames[ProxyType]="PROXY_TYPE";
+    settingNames[ProxyUsername]="PROXY_USERNAME";
+    settingNames[LastVersionCheck]="LAST_VERSION_CHECK";
+    settingNames[LastInfoCheck]="LAST_INFO_CHECK";
+    settingNames[InfoDate]="INFO_DATE";
+    settingNames[SaveDownloaded]="SAVE_DOWNLOADED";
+
     settings = new QSettings("WinAppM_settings.ini",QSettings::IniFormat);
     setNetworkProxy();
 }
@@ -248,14 +289,6 @@ void SettingsDialog::unLoadSettings()
     delete settings;
 }
 
-void SettingsDialog::setNetworkProxy()
-{
-    if(proxyEnabled())
-    {
-        QNetworkProxy proxy = getProxySettings();
-        QNetworkProxy::setApplicationProxy(proxy);
-    }
-}
 
 void SettingsDialog::on_btCancel_clicked()
 {
@@ -294,64 +327,12 @@ bool SettingsDialog::startsWithSystem()
     }else
         return false;
 }
-int SettingsDialog::simulDownloadCount()
-{
-    return settings->value("DOWNLOAD_COUNT",3).toInt();
-}
 
-QDate SettingsDialog::lastInfoUpdate()
-{
-    return settings->value("LAST_INFO_CHECK",0).toDate();
-}
 
-void SettingsDialog::setLastInfoUpdate(QDate date)
+void SettingsDialog::setValue(Keys key, QVariant value)
 {
-    settings->setValue("LAST_INFO_CHECK",date);
-}
-
-QDate SettingsDialog::lastVersionUpdate()
-{
-    return settings->value("LAST_VERSION_CHECK",0).toDate();
-}
-
-void SettingsDialog::setLastVersionUpdate(QDate date)
-{
-    settings->setValue("LAST_VERSION_CHECK",date);
-}
-
-int SettingsDialog::getUninstallMode()
-{
-    return settings->value("UNINSTALL_MODE").toInt();
-}
-
-int SettingsDialog::getInstallMode()
-{
-    return settings->value("INSTALL_MODE").toInt();
-}
-
-int SettingsDialog::getUpgradeMode()
-{
-    return settings->value("UPGRADE_MODE").toInt();
-}
-
-int SettingsDialog::getCloseMode()
-{
-    return settings->value("CLOSE_MODE").toInt();
-}
-
-int SettingsDialog::getInstallTaskMode()
-{
-    return settings->value("INSTALL_TASK_MODE",SILENT).toInt();
-}
-
-bool SettingsDialog::shouldCheckVersions()
-{
-    return settings->value("CHECK_VERSIONS",true).toBool();
-}
-
-bool SettingsDialog::shouldCheckAppInfo()
-{
-    return settings->value("CHECK_INFO",true).toBool();
+    QString str = settingNames[key];
+    settings->setValue(str,value);
 }
 
 QPoint SettingsDialog::screenCenter()
@@ -363,11 +344,11 @@ QPoint SettingsDialog::screenCenter()
     return pos;
 }
 
+
 QString SettingsDialog::currentVersion()
 {
     QDate buildDate = QLocale(QLocale::C).toDate(QString(__DATE__).simplified(), QLatin1String("MMM d yyyy"));
     return buildDate.toString("yy.MM.d");
 }
-
 
 

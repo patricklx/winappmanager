@@ -92,7 +92,7 @@ QString toReadableSize(double size)
 
 
 
-winapp_manager_updater::winapp_manager_updater()
+WinappManagerUpdater::WinappManagerUpdater()
     :QDialog(),ui(new Ui_UpdaterDialog)
 {
     ui->setupUi(this);
@@ -114,13 +114,13 @@ winapp_manager_updater::winapp_manager_updater()
 }
 
 
-winapp_manager_updater::~winapp_manager_updater()
+WinappManagerUpdater::~WinappManagerUpdater()
 {
     delete ui;
     close();
 }
 
-void winapp_manager_updater::check()
+void WinappManagerUpdater::check()
 {
     QUrl url = QUrl("http://appdriverupdate.sourceforge.net/Files/Updates/WinApp_Manager.txt");
     if(reply!=NULL)
@@ -129,7 +129,7 @@ void winapp_manager_updater::check()
     connect(reply,SIGNAL(finished()),SLOT(check_version()));
 }
 
-void winapp_manager_updater::check_version()
+void WinappManagerUpdater::check_version()
 {
     QString html = reply->readAll();
     reply->deleteLater();
@@ -150,7 +150,7 @@ void winapp_manager_updater::check_version()
 
 
     QString act_version = SettingsDialog::currentVersion();
-    qDebug("'%s'",act_version.toAscii().data());
+    qDebug("'%s'",act_version.toLatin1().data());
     latest_version = version;
     if(version == act_version)
     {
@@ -170,7 +170,7 @@ QUrl redirectUrl(const QUrl& possibleRedirectUrl, const QUrl& oldRedirectUrl)
     return redirectUrl;
 }
 
-void winapp_manager_updater::showProgress()
+void WinappManagerUpdater::showProgress()
 {
     WinApp_Manager_File = new QFile("Winapp_Manager_portable.zip");
     if(!WinApp_Manager_File->open(QFile::WriteOnly))
@@ -194,7 +194,7 @@ void winapp_manager_updater::showProgress()
 
 }
 
-void winapp_manager_updater::getRedirect()
+void WinappManagerUpdater::getRedirect()
 {
     if(reply==NULL)
         return;
@@ -202,7 +202,7 @@ void winapp_manager_updater::getRedirect()
     if(!possibleRedirectUrl.toString().isEmpty())
     {
         qDebug("redirect");
-        qDebug(possibleRedirectUrl.toString().toAscii());
+        qDebug(possibleRedirectUrl.toString().toLatin1());
         reply->deleteLater();
         reply->disconnect();
         reply = qnam.get(QNetworkRequest(possibleRedirectUrl.toString()));
@@ -218,7 +218,7 @@ void winapp_manager_updater::getRedirect()
     QString url = regex.cap(1);
     url.replace("&amp;","&");
     qDebug("follow");
-    qDebug(url.toAscii());
+    qDebug(url.toLatin1());
 
     reply->deleteLater();
     reply->disconnect();
@@ -226,7 +226,7 @@ void winapp_manager_updater::getRedirect()
     connect(reply,SIGNAL(finished()),SLOT(getRedirect()));
 }
 
-void winapp_manager_updater::download()
+void WinappManagerUpdater::download()
 {
     QString link ;
     link = "http://sourceforge.net/projects/appdriverupdate/files/WinApp_Manager/winapp_manager_portable_32_64_{ver}.zip/download";
@@ -235,14 +235,14 @@ void winapp_manager_updater::download()
     if(reply!=NULL)
         return;
 
-    qDebug(link.toAscii());
+    qDebug(link.toLatin1());
     QUrl url = QUrl(link);
     reply = qnam.get(QNetworkRequest(url));
     connect(reply,SIGNAL(finished()),SLOT(getRedirect()));
 
 }
 
-void winapp_manager_updater::downloaded()
+void WinappManagerUpdater::downloaded()
 {
     qDebug("downloaded");
 
@@ -269,7 +269,7 @@ void winapp_manager_updater::downloaded()
     reply = NULL;
 }
 
-void winapp_manager_updater::cancel()
+void WinappManagerUpdater::cancel()
 {
     qDebug("abort");
     this->hide();
@@ -290,7 +290,7 @@ void winapp_manager_updater::cancel()
     WinApp_Manager_File = NULL;
 }
 
-void winapp_manager_updater::setProgress(qint64 recieved, qint64 total)
+void WinappManagerUpdater::setProgress(qint64 recieved, qint64 total)
 {
     if(reply==NULL || reply->isFinished())
     {
@@ -319,7 +319,7 @@ void winapp_manager_updater::setProgress(qint64 recieved, qint64 total)
 }
 
 
-void winapp_manager_updater::activate()
+void WinappManagerUpdater::activate()
 {
     update_timer.start();
     check();
