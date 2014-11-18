@@ -21,6 +21,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
     move(SettingsDialog::screenCenter()-rect().bottomRight()/2);
 
+
     timer_update.setInterval(1000*60*60*2);//check every 2 hour
     connect(&timer_update,SIGNAL(timeout()),SLOT(timerEvent()));
 
@@ -45,7 +46,6 @@ MainWindow::MainWindow(QWidget *parent) :
     trayicon->setContextMenu(menu);
 
     connect(ui->mainWidget,SIGNAL(versions_available()),SLOT(newVersionMessage()));
-
     connect(ui->mainWidget,SIGNAL(status(QString)),SLOT(setStatus(QString)));
 
     QTimer::singleShot(60*1000,this,SLOT(resetTaskBarIcon()));
@@ -53,7 +53,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QFile checkPortable("portableUpdater.bat");
     if(checkPortable.exists())
     {
-        if(SettingsDialog::value<bool>(SettingsDialog::CheckWinappManagerVersion))
+        if(SettingsDialog::value("CHECK_VERSIONS").toBool())
             updater.activate();
     }else
         ui->actionCheck_for_update->deleteLater();
@@ -97,7 +97,7 @@ void MainWindow::onTrayDoubleClicked(QSystemTrayIcon::ActivationReason reason)
 
 void MainWindow::setStatus(QString text)
 {
-    Q_UNUSED(text)
+
 }
 
 
@@ -118,7 +118,7 @@ void MainWindow::closeEvent(QCloseEvent *evt)
 {
     if(evt->spontaneous())
     {
-        if( SettingsDialog::value<int>(SettingsDialog::CloseMode) == SettingsDialog::Ask )
+        if( SettingsDialog::value("CLOSE_MODE").toInt() == SettingsDialog::Ask )
         {
             int ans = QMessageBox::information(this,"Closing Winapp_Manager",
                                                "Close Winapp_Manager?\n If not, Winapp_Manager will minimize to tray and check every hour for updates",
@@ -144,14 +144,14 @@ void MainWindow::closeEvent(QCloseEvent *evt)
                 timer_update.start();
             }
         }
-        if( SettingsDialog::value<int>(SettingsDialog::CloseMode) == SettingsDialog::Minimize )
+        if( SettingsDialog::value("CLOSE_MODE").toInt() == SettingsDialog::Minimize )
         {
             evt->ignore();
             this->hide();
             timer_update.start();
         }
 
-        if( SettingsDialog::value<int>(SettingsDialog::CloseMode) == SettingsDialog::Close )
+        if( SettingsDialog::value("CLOSE_MODE").toInt() == SettingsDialog::Close )
         {
             evt->accept();
             QApplication::quit();
@@ -189,7 +189,7 @@ void MainWindow::on_actionAbout_triggered()
     about = tr("<h3>WinApp_Manager - %1</h3>\n").arg(SettingsDialog::currentVersion()) +
             "WinApp_Manager is a free program. We are grateful to SourceForge.net for our project hosting.\nThis Program is available for Windows 98 and later.\n If you want to help keeping the information up to date just go to our homepage and do it :"+
             "\n\n<h3>Licence:</h3>GPL\n"+
-            "<h3>Website:</h3> <a href=\"https://winappmanager-patrick.dotcloud.com/\">https://winappmanager-patrick.dotcloud.com</a>";
+            "<h3>Website:</h3> <a href=\"http://appdriverupdate.sourceforge.net/\">http://appdriverupdate.sourceforge.net</a>";
     aboutmsg.setText(about);
     aboutmsg.exec();
 
@@ -200,9 +200,10 @@ void MainWindow::on_actionAboutQt_triggered()
     QMessageBox::aboutQt(this,"aboutQt");
 }
 
+
 void MainWindow::on_actionRequest_Software_Support_triggered()
 {
-    QDesktopServices::openUrl(QString("https://winappmanager-patrick.dotcloud.com/request/"));
+    QDesktopServices::openUrl(QString("http://winappmanager.herokuapp.com/request/"));
 }
 
 void MainWindow::on_actionCheck_for_update_triggered()

@@ -13,6 +13,7 @@ namespace Ui {
     class MainWindow;
 }
 
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -25,7 +26,7 @@ private:
     Ui::MainWindow *ui;
     QTimer timer_update;
     QSystemTrayIcon *trayicon;
-    WinappManagerUpdater updater;
+    winapp_manager_updater updater;
     bool showMessageBox;
 
 private slots:

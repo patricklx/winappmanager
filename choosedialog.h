@@ -16,7 +16,7 @@ class ChooseDialog : public QDialog
 public:
     explicit ChooseDialog(AppInfo *appinfo,QWidget *parent = 0);
     ~ChooseDialog();
-    Task *execute();
+    Task *_exec();
 
 private slots:
     void on_btOk_clicked();

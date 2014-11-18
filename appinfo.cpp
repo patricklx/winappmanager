@@ -886,7 +886,7 @@ bool AppInfo::load()
 		_path=_path + _categories[index] + "/" ;
 	}
 
-    if(SettingsDialog::value<bool>(SettingsDialog::SaveDownloaded)){
+	if(SettingsDialog::value("SAVE_DOWNLOADED").toBool()){
 		_path = QDir::currentPath() + "/" + _path + _name;
 	}else{
 		QString path = QStandardPaths::writableLocation(QStandardPaths::TempLocation);

@@ -6,7 +6,7 @@
 #include "appinfo.h"
 #include "settingsdialog.h"
 
-ChooseDialog::ChooseDialog(AppInfo *info,QWidget *parent) :
+ChooseDialog::ChooseDialog(AppInfo *info, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::ChooseDialog)
 {
@@ -15,9 +15,9 @@ ChooseDialog::ChooseDialog(AppInfo *info,QWidget *parent) :
     m_info = info;
     this->setWindowTitle("Select: "+m_info->name());
 
-    if( info->getInstallInfo().onlySilent )
+    if( info->isFlagSet(AppInfo::OnlySilent) )
     {
-        ui->checkSilent->setChecked(true);
+        ui->checkSilent->setChecked(true);;
         ui->checkSilent->setDisabled(true);
     }
 
@@ -25,7 +25,7 @@ ChooseDialog::ChooseDialog(AppInfo *info,QWidget *parent) :
         ui->checkSilent->setDisabled(true);
     else
     {
-        if(SettingsDialog::value<int>(SettingsDialog::InstallMode)==SettingsDialog::Silent)
+        if(SettingsDialog::value("INSTALL_MODE").toInt()==SettingsDialog::Silent)
             ui->checkSilent->setChecked(true);
     }
 
@@ -39,7 +39,7 @@ ChooseDialog::ChooseDialog(AppInfo *info,QWidget *parent) :
 
     for(int i=0;i<info->urls().count();i++)
     {
-        ui->listWidget->addItem(info->urls()[i].description);
+        ui->listWidget->addItem(info->urls().at(i).description);
     }
 
     ui->listWidget->setCurrentRow(0);
@@ -69,75 +69,51 @@ void ChooseDialog::on_btCancel_clicked()
     close();
 }
 
-Task *ChooseDialog::execute()
+Task *ChooseDialog::_exec()
 {
     int result = QDialog::exec();
     if( result==0 )
         return NULL;
 
     int index = ui->listWidget->currentRow();
+    AppInfo::UrlContainer url = m_info->urls().at(index);
 
-    int flags;
-    if( !m_info->isFlagSet(AppInfo::Downloaded) ||
-            m_info->getUserData().downloadedVersion != m_info->getUserData().latestVersion ){
+    foreach(QString key, url.parameter.keys() ){
 
-        flags = Task::DOWNLOAD;
+        forever{
+            QString param = url.parameter[key];
+            QStringList choices = param.split(";");
+            if( key == "lang" ){
+                QStringList tmp;
+                foreach(QString lang, choices) {
+                    QLocale locale(lang);
+                    QLocale::Language l = locale.language();
+                    QLocale::Country c = locale.country();
+                    QString str = QLocale::languageToString(l) + " - " + QLocale::countryToString(c);
+                    tmp.append(str);
+                }
+                choices = tmp;
+            }
+            if( choices.length()>0 ){
+                QString choice = QInputDialog::getItem(this,"choose " + key,key, choices,0,false);
+                int index = choices.indexOf(choice);
+                choices = param.split(";");
+                choice = choices.at(index);
+                url.url.replace(QString("{%1}").arg(key),choice);
+                break;
+            }
+        }
     }
 
+    int flags;
+    flags = Task::DOWNLOAD;
     if(ui->checkInstall->isChecked())
         flags |= Task::INSTALL;
     if(ui->checkSilent->isChecked())
         flags |= Task::SILENT;
 
-    AppInfo::UrlContainer url = m_info->urls()[index];
-    url.description="";
-    qDebug()<<"parameter"<<url.parameter;
-
-    QMapIterator<QString, QString> i(url.parameter);
-    while (i.hasNext()) {
-        i.next();
-        qDebug()<<"choice: "<<i.key();
-        QStringList choices = i.value().split(";");
-        qDebug()<<"choices: "<<i.value();
-        QStringList languages;
-        if(i.key()=="lang"){
-
-            foreach(QString choice,choices)
-            {
-
-                QLocale locale(choice);
-                if(locale.language()!=QLocale::C){
-                    QLocale::Language lang = locale.language();
-                    QLocale::Country country = locale.country();
-                    languages.append(QLocale::languageToString(lang)+
-                                     " "+
-                                     QLocale::countryToString(country));
-                }
-                else
-                    languages.append(choice);
-            }
-            if(languages.count()>1){
-                QString lang = QInputDialog::getItem(this,"Select "+i.key(),i.key()+": ",languages);
-                int index = languages.indexOf(lang);
-                url.parameter["lang"]=choices.at(index);
-                m_info->setChoice(i.key(),choices.at(index));
-                url.description += "lang: "+choices.at(index)+", ";
-            }
-        }else{
-
-            if(choices.count()>1){
-                QString choice = QInputDialog::getItem(this,"Select "+i.key(),i.key()+": ",choices);
-                url.parameter[i.key()]=choice;
-                m_info->setChoice(i.key(),choice);
-                url.description += i.key()+": "+choice+", ";
-            }
-        }
-        if( choices.count()==1 )
-            m_info->setChoice(i.key(),i.value());
-    }
-
     Task *task = new Task(m_info,
-                             url,
+                              url,
                               (Task::task_flags)flags
                               );
     return task;

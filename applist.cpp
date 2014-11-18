@@ -145,7 +145,7 @@ AppList::AppList(QWidget *parent) :
 
 	QTimer::singleShot(100,this,SLOT(load()));
 
-    if( SettingsDialog::value<int>(SettingsDialog::InstallMode) == SettingsDialog::Silent )
+	if( SettingsDialog::value("INSTALL_MODE").toInt() == SettingsDialog::Silent )
 	{
 		ui->automaticRb->setChecked(true);
 	}else{
@@ -300,7 +300,7 @@ void AppList::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
 		if( action->text() == "Select")
 		{
 			ChooseDialog dialog(info,this);
-            Task *task = dialog.execute();
+			Task *task = dialog._exec();
 			if(task!=NULL)
 			{
 				emit taskChosen(task);
@@ -344,7 +344,7 @@ void AppList::on_LAppInfoList_customContextMenuRequested(const QPoint &pos)
 			if(!task->appInfo()->getInstallInfo().silentParameter.isEmpty()
 					&& !task->appInfo()->getInstallInfo().onlySilent)
 			{
-                switch(SettingsDialog::value<int>(SettingsDialog::InstallMode))
+				switch(SettingsDialog::value("INSTALL_MODE").toInt())
 				{
 				case SettingsDialog::Ask:
 				{
@@ -512,7 +512,7 @@ void AppList::setRegistryInfo(RegistryGroup group)
 		}
 	}
 
-    if(!SettingsDialog::value<bool>(SettingsDialog::ShowAllApps))
+	if(!SettingsDialog::value("SHOW_ALL_APPS").toBool())
 		return;
 
 	qDebug()<<"added " <<group.displayed_name;
@@ -605,8 +605,8 @@ bool AppList::load()
 	qDebug()<<fileinfo_list.count();
 	QDateTime datetime(QDate::currentDate());
 	qDebug() << "will update?" << datetime.toMSecsSinceEpoch()/1000;
-    if( (SettingsDialog::value<bool>(SettingsDialog::CheckInfo) &&
-         SettingsDialog::value<int>(SettingsDialog::LastInfoCheck) < datetime.toMSecsSinceEpoch()/1000)
+	if( (SettingsDialog::value("CHECK_INFO").toBool() &&
+		 SettingsDialog::value("LAST_INFO_CHECK").toInt() < datetime.toMSecsSinceEpoch()/1000)
 			|| fileinfo_list.isEmpty())
 	{
 		qDebug()<<"list is empty-> download";
@@ -614,11 +614,11 @@ bool AppList::load()
 		return false;
 	}
 
-    if( SettingsDialog::value<bool>(SettingsDialog::CheckVersions) &&
-            SettingsDialog::value<QDate>(SettingsDialog::LastVersionCheck) < QDate::currentDate() )
+	if( SettingsDialog::value("CHECK_VERSION").toBool() &&
+			SettingsDialog::value("LAST_VERSION_CHECK").toDate() < QDate::currentDate() )
 	{
 		QTimer::singleShot(500,this,SLOT(on_btUpdate_clicked()));
-        SettingsDialog::setValue(SettingsDialog::LastVersionCheck, QDate::currentDate());
+		SettingsDialog::setValue("LAST_VERSION_CHECK",QDate::currentDate());
 	}
 
 	AppinfoRegistry reginfo;
@@ -666,7 +666,7 @@ void AppList::prepareUi()
 	item->setIcon(0,QIcon("://icons/isnew.ico"));
 	ui->TCategoryTree->addTopLevelItem(item);
 
-    if(SettingsDialog::value<bool>(SettingsDialog::ShowAllApps))
+	if(SettingsDialog::value("SHOW_ALL_APPS").toBool())
 	{
 		item = new QTreeWidgetItem(QStringList("all installed apps"));
 		ui->TCategoryTree->addTopLevelItem(item);
@@ -1043,7 +1043,7 @@ void AppList::upgrade(QTreeWidgetItem* item)
 	}
 	if(info->getDownloadedFileUrl().url.isEmpty()){
 		ChooseDialog dialog(info,this);
-        Task *task = dialog.execute();
+		Task *task = dialog._exec();
 		if(task!=NULL)
 		{
 			emit taskChosen(task);
@@ -1064,7 +1064,7 @@ void AppList::install(QTreeWidgetItem* item)
 {
 	AppInfo *info = getAppInfo(item);
 	ChooseDialog dialog(info,this);
-    Task *task = dialog.execute();
+	Task *task = dialog._exec();
 	if(task!=NULL)
 	{
 		emit taskChosen(task);
@@ -1148,7 +1148,7 @@ void AppList::on_btUpdateInfo_clicked()
 			onSetAppInfoUpdated(name);
 		}
 
-        SettingsDialog::setValue(SettingsDialog::LastInfoCheck, QDateTime::currentMSecsSinceEpoch()/1000);
+		SettingsDialog::setValue("LAST_INFO_CHECK",QDateTime::currentMSecsSinceEpoch()/1000);
 		ui->btUpdateInfo->setIcon(QIcon(":icons/isnew.ico"));
 		QList<QTreeWidgetItem*> items = ui->TCategoryTree->findItems("New/Updated",Qt::MatchExactly);
 
@@ -1158,7 +1158,7 @@ void AppList::on_btUpdateInfo_clicked()
 
 		ui->TCategoryTree->setCurrentItem(item,0,QItemSelectionModel::ClearAndSelect);
 	}else{
-        SettingsDialog::setValue(SettingsDialog::LastInfoCheck, QDateTime::currentMSecsSinceEpoch()/1000);
+		SettingsDialog::setValue("LAST_INFO_CHECK",QDateTime::currentMSecsSinceEpoch()/1000);
 		load();
 	}
 }

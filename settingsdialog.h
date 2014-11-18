@@ -4,8 +4,6 @@
 #include <QDialog>
 #include <QDate>
 #include <QNetworkProxy>
-#include <QSettings>
-#include <QMap>
 
 namespace Ui {
     class SettingsDialog;
@@ -16,7 +14,7 @@ class SettingsDialog : public QDialog
     Q_OBJECT
 
 public:
-    enum SettingVals{
+    enum settings_values{
         Ask,
         Attended,
         Silent,
@@ -24,44 +22,21 @@ public:
         Minimize
     };
 
-    enum Keys{
-        CheckWinappManagerVersion,
-        CheckVersions,
-        CheckInfo,
-        DlPackages,
-        MaxDownloads,
-        ShowAllApps,
-        InstallMode,
-        UninstallMode,
-        UpgradeMode,
-        CloseMode,
-        InstallTaskMode,
-        ProxyEnabled,
-        ProxyHostname,
-        ProxyPort,
-        ProxyType,
-        ProxyUsername,
-        LastVersionCheck,
-        LastInfoCheck,
-        InfoDate,
-        SaveDownloaded
-    };
-
-
     explicit SettingsDialog(QWidget *parent = 0);
     ~SettingsDialog();
 
     bool setStartWithSystem(bool start_with_system);
     bool startsWithSystem();
 
-
+    static void setNetworkProxy();
     static QNetworkProxy getProxySettings();
-
 
     static void saveSettings();
 
     static void loadSettings();
     static void unLoadSettings();
+
+    static bool showAllApps();
 
     static QPoint screenCenter();
 
@@ -72,22 +47,8 @@ public:
 
     static QString currentVersion();
 
-    struct SettingsVals{
-            QString name;
-            QVariant value;
-    };
-    static QMap<int,QVariant> settingsDefaults;
-    static QMap<int,QString> settingNames;
-    template <class T>
-    static T value(Keys key)
-    {
-        QString name = settingNames[key];
-        QVariant defaultVal = settingsDefaults[key];
-        return SettingsDialog::settings->value(name,defaultVal).value<T>();
-    }
-
-    static void setNetworkProxy();
-    static void setValue(Keys key, QVariant value);
+    static QVariant value(QString key);
+    static void setValue(QString key, QVariant value);
 
 private slots:
     void on_btApply_clicked();
@@ -96,7 +57,7 @@ private slots:
 
 private:
     Ui::SettingsDialog *ui;
-    static QSettings *settings;
+    static QMap<QString,QVariant> defaults;
 };
 
 #endif // SETTINGSDIALOG_H

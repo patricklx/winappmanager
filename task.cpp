@@ -556,7 +556,7 @@ bool Task::download()
 	parameters << "--check-certificate=false";
 
 
-    if(SettingsDialog::value<bool>(SettingsDialog::ProxyEnabled))
+	if(SettingsDialog::value("PROXY_ENABLED").toBool())
 	{
 		QNetworkProxy proxy = SettingsDialog::getProxySettings();
 		//[http://][USER:PASSWORD@]HOST[:PORT]

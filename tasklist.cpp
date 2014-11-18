@@ -25,7 +25,7 @@ TaskList::TaskList(QWidget *parent) :
 	isInstalling = false;
 	winapp_manager = NULL;
 
-    if(SettingsDialog::value<int>(SettingsDialog::InstallMode) == SettingsDialog::Silent)
+	if(SettingsDialog::value("INSTALL_MODE").toInt() == SettingsDialog::Silent)
 	{
 		automaticFirst = true;
 	}else
@@ -275,7 +275,7 @@ void TaskList::onSilentTaskFinished()
 
 void TaskList::startTasks()
 {
-    int maxDownloads = SettingsDialog::value<int>(SettingsDialog::MaxDownloads);
+	int maxDownloads = SettingsDialog::value("DOWNLOAD_COUNT").toInt();
 	for(int i=download_count+silentdownload_count;i<maxDownloads;i++)
 	{
 		if( this->automaticFirst )

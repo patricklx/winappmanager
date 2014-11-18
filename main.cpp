@@ -1,19 +1,13 @@
 
-#include <QtGui/QGuiApplication>
+#include <QApplication>
 #include "mainwindow.h"
 #include "settingsdialog.h"
 #include <qplugin.h>
 #include <QDir>
 #include <QString>
-#include <QDebug>
-#include <qplatformdefs.h>
-#include <QStandardPaths>
 #include "utils/qstringext.h"
-#include <iostream>
-#include <string>
-#include <list>
-#include <windows.h>
-#include "yaml-cpp/yaml.h"
+#include <QIconEnginePlugin>
+#include <QIcon>
 
 #if defined(QT_NO_DEBUG)
 //Q_IMPORT_PLUGIN(QICOPlugin)
@@ -22,9 +16,9 @@
 #endif
 
 
-void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+
+void myMessageHandler(QtMsgType type,const QMessageLogContext &context, const QString &msg)
 {
-    Q_UNUSED(context)
     QString txt;
     switch (type) {
         case QtDebugMsg:
@@ -47,13 +41,11 @@ void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const Q
     ts << txt << endl;
 }
 
-
 int main(int argc, char *argv[])
 {
     QDir::setCurrent(QStringExt(argv[0]).beforeLast('\\'));
     QApplication a(argc, argv);
-    QCoreApplication::setApplicationName("WinAppManager");
-    //QApplication::setStyle("Fusion");
+
 
     QStringList cmdline_args = a.arguments();
     if( cmdline_args.contains("debug") )
@@ -68,9 +60,8 @@ int main(int argc, char *argv[])
     a.setQuitOnLastWindowClosed(false);
     SettingsDialog::loadSettings();
 
-
     MainWindow w;
-    if(!(argc>1 && QString(argv[1])==QString("hidden")))
+    if(!(argc>0 && QString(argv[1])==QString("hidden")))
     {
         w.show();
     }
@@ -79,7 +70,6 @@ int main(int argc, char *argv[])
     SettingsDialog::unLoadSettings();
     return ret;
 }
-
 
 /*
 
@@ -96,4 +86,5 @@ int main(int argc, char *argv[])
     {
         writeAttribute(qualifiedName,value.toString());
     }
-*/
+
+    */
