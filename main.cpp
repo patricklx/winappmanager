@@ -16,7 +16,9 @@
 #include "yaml-cpp/yaml.h"
 
 #if defined(QT_NO_DEBUG)
-Q_IMPORT_PLUGIN(QICOPlugin)
+//Q_IMPORT_PLUGIN(QICOPlugin)
+//Q_IMPORT_PLUGIN(AccessibleFactory)
+//Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 #endif
 
 

@@ -16,8 +16,8 @@ QMap<int,QString> SettingsDialog::settingNames = QMap<int,QString>();
 QMap<int,QVariant> SettingsDialog::settingsDefaults = QMap<int,QVariant>();
 
 SettingsDialog::SettingsDialog(QWidget *parent) :
-    QDialog(parent),
-    ui(new Ui::SettingsDialog)
+	QDialog(parent),
+	ui(new Ui::SettingsDialog)
 {
     ui->setupUi(this);
 
@@ -119,13 +119,11 @@ SettingsDialog::SettingsDialog(QWidget *parent) :
     ui->proxy_username->setText( settings->value("PROXY_USERNAME").toString() );
     ui->proxy_port->setText( settings->value("PROXY_PORT").toString() );
     ui->proxy_password->setText( settings->value("PROXY_PASSWORD").toString());
-
 }
 
 SettingsDialog::~SettingsDialog()
 {
-    delete ui;
-
+	delete ui;
 }
 
 void SettingsDialog::on_btApply_clicked()
@@ -221,24 +219,24 @@ void SettingsDialog::setNetworkProxy()
 
 QNetworkProxy SettingsDialog::getProxySettings()
 {
-    QNetworkProxy proxy;
-    proxy.setType((QNetworkProxy::ProxyType)settings->value("PROXY_TYPE").toInt());
-    proxy.setHostName(settings->value("PROXY_HOSTNAME").toString());
-    proxy.setUser(settings->value("PROXY_USERNAME").toString());
-    proxy.setPassword(settings->value("PROXY_PASSWORD").toString());
-    proxy.setPort(settings->value("PROXY_PORT").toInt());
-    return proxy;
+	QNetworkProxy proxy;
+	proxy.setType((QNetworkProxy::ProxyType)settings->value("PROXY_TYPE").toInt());
+	proxy.setHostName(settings->value("PROXY_HOSTNAME").toString());
+	proxy.setUser(settings->value("PROXY_USERNAME").toString());
+	proxy.setPassword(settings->value("PROXY_PASSWORD").toString());
+	proxy.setPort(settings->value("PROXY_PORT").toInt());
+	return proxy;
 }
 
 bool SettingsDialog::updatedToLatestVersion()
 {
-    return (settings->value("latestVersion").toString() == "4.0");
+	return (settings->value("latestVersion","1.0").toString() == "4.0");
 }
 
 
 void SettingsDialog::setUpdatedToLatestVersion()
 {
-    settings->setValue("latestVersion","4.0");
+	settings->setValue("latestVersion","4.0");
 }
 
 void SettingsDialog::loadSettings()
@@ -285,47 +283,46 @@ void SettingsDialog::loadSettings()
 
 void SettingsDialog::unLoadSettings()
 {
-    saveSettings();
-    delete settings;
+	saveSettings();
+	delete settings;
 }
-
 
 void SettingsDialog::on_btCancel_clicked()
 {
-    close();
+	close();
 }
 
 void SettingsDialog::saveSettings()
 {
-    settings->sync();
+	settings->sync();
 }
 
 
 bool SettingsDialog::setStartWithSystem(bool start_with_system)
 {
-    QSettings registry("HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\", QSettings::NativeFormat);
-    if(start_with_system==true)
-    {
-        QString path = QDir::currentPath()+"/WinApp_Manager.exe";
-        path = "\""+path.replace('/','\\')+"\" hidden";
-        registry.setValue("WinApp_Manager",path);
-    }
-    else
-        registry.remove("WinApp_Manager");
+	QSettings registry("HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\", QSettings::NativeFormat);
+	if(start_with_system==true)
+	{
+		QString path = QDir::currentPath()+"/WinApp_Manager.exe";
+		path = "\""+path.replace('/','\\')+"\" hidden";
+		registry.setValue("WinApp_Manager",path);
+	}
+	else
+		registry.remove("WinApp_Manager");
 
-    if(registry.status() != QSettings::NoError)
-        return false;
-    return true;
+	if(registry.status() != QSettings::NoError)
+		return false;
+	return true;
 }
 
 bool SettingsDialog::startsWithSystem()
 {
-    QSettings registry("HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\", QSettings::NativeFormat);
-    if( registry.contains("WinApp_Manager") )
-    {
-        return true;
-    }else
-        return false;
+	QSettings registry("HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\", QSettings::NativeFormat);
+	if( registry.contains("WinApp_Manager") )
+	{
+		return true;
+	}else
+		return false;
 }
 
 
@@ -337,18 +334,16 @@ void SettingsDialog::setValue(Keys key, QVariant value)
 
 QPoint SettingsDialog::screenCenter()
 {
-    QPoint pos = QCursor::pos();
-    int desktop = QApplication::desktop()->screenNumber(pos);
-    QDesktopWidget *monitor = QApplication::desktop();
-    pos = monitor->availableGeometry(desktop).center();
-    return pos;
+	QPoint pos = QCursor::pos();
+	int desktop = QApplication::desktop()->screenNumber(pos);
+	QDesktopWidget *monitor = QApplication::desktop();
+	pos = monitor->availableGeometry(desktop).center();
+	return pos;
 }
 
 
 QString SettingsDialog::currentVersion()
 {
-    QDate buildDate = QLocale(QLocale::C).toDate(QString(__DATE__).simplified(), QLatin1String("MMM d yyyy"));
-    return buildDate.toString("yy.MM.d");
+	QDate buildDate = QLocale(QLocale::C).toDate(QString(__DATE__).simplified(), QLatin1String("MMM d yyyy"));
+	return buildDate.toString("yy.MM.d");
 }
-
-
