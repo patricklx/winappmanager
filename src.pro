@@ -11,7 +11,7 @@ QT += xml
 QT += network
 TARGET = WinAppManager
 TEMPLATE = app
-CONFIG+=exceptions
+CONFIG += exceptions
 CONFIG += openssl-linked
 
 YAML = E:\programming\tools\yaml
@@ -35,21 +35,20 @@ QMAKE_CXXFLAGS+=-g -fexceptions
 QMAKE_STRIP=
 QMAKE_LFLAGS_RELEASE=
 
-
 contains(CONFIG,release)   {
     message (release build)
    CONFIG += static
-#   LIBS += -L$$[QT_INSTALL_PLUGINS]/imageformats -lqico
-#   LIBS += -L$$[QT_INSTALL_PLUGINS]/accessible -lqtaccessiblewidgets
-#   LIBS += -L$$[QT_INSTALL_PLUGINS]/platforms -lqwindows
+   LIBS += -L$$[QT_INSTALL_PLUGINS]/imageformats -lqico
+   LIBS += -L$$[QT_INSTALL_PLUGINS]/accessible -lqtaccessiblewidgets
+   LIBS += -L$$[QT_INSTALL_PLUGINS]/platforms -lqwindows
    LIBS += -L$$OPENSSL -lcrypto -lssl
 
-   QMAKE_LFLAGS += -static-libgcc -static
+   QMAKE_LFLAGS += -static-libgcc -static-libstdc -static
     contains(CONFIG,release64){
-	LIBS += -L$$YAML/build/release64 -lyaml-cpp
-	DESTDIR = build/release64
+        LIBS += -L$$YAML/build/release64 -lyaml-cpp
+        DESTDIR = build/release64
     }else{
-	LIBS += -L$$YAML/build/release/ -lyaml-cpp
+        LIBS += -L$$YAML/build/release/ -lyaml-cpp
     }
 }else{
     LIBS += -L$$YAML/debug/ -lyaml-cpp
@@ -61,7 +60,7 @@ UI_DIR = gui
 INCLUDEPATH += $$PWD
 
 SOURCES += main.cpp\
-	mainwindow.cpp \
+        mainwindow.cpp \
     settingsdialog.cpp \
     choosedialog.cpp \
     updaterdialog.cpp \
