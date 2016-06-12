@@ -78,8 +78,7 @@ void TaskList::removeTask(AppInfo *info)
 		installList.removeOne(t);
 		silentInstallList.removeOne(t);
 		downloadSilentList.removeOne(t);
-		downloadList.removeOne(t);
-		emit onTaskRemoved(t->appInfo());
+		downloadList.removeOne(t);		
 		if(t->appInfo()->name() == "WinApp_Manager")
 		{
 			winapp_manager = NULL;
@@ -87,6 +86,7 @@ void TaskList::removeTask(AppInfo *info)
 		t->disconnect();
 		t->deleteLater();
 		ui->LTaskList->removeItemWidget(item,1);
+        emit onTaskRemoved(t->appInfo());
 		delete item;
 	}else
 	{

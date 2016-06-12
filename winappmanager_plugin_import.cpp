@@ -2,3 +2,6 @@
 // static plugins specified using QTPLUGIN and QT_PLUGIN_CLASS.<plugin> variables.
 #include <QtPlugin>
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+Q_IMPORT_PLUGIN(QICOPlugin)
+Q_IMPORT_PLUGIN(QGenericEnginePlugin)
+Q_IMPORT_PLUGIN(QNativeWifiEnginePlugin)

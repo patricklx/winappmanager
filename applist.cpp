@@ -614,6 +614,8 @@ bool AppList::load()
 		return false;
 	}
 
+    qDebug()<<"CHECK_VERSION" << SettingsDialog::value("CHECK_VERSION").toBool();
+    qDebug()<<"CHECK_VERSION" << SettingsDialog::value("CHECK_VERSION");
 	if( SettingsDialog::value("CHECK_VERSION").toBool() &&
 			SettingsDialog::value("LAST_VERSION_CHECK").toDate() < QDate::currentDate() )
 	{

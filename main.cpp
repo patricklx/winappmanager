@@ -8,10 +8,11 @@
 #include "utils/qstringext.h"
 #include <QIconEnginePlugin>
 #include <QIcon>
+#include <QStandardPaths>
+#include <QSslSocket>
 
 #if defined(QT_NO_DEBUG)
 Q_IMPORT_PLUGIN(QICOPlugin)
-Q_IMPORT_PLUGIN(AccessibleFactory)
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 #endif
 
@@ -43,8 +44,13 @@ void myMessageHandler(QtMsgType type,const QMessageLogContext &context, const QS
 
 int main(int argc, char *argv[])
 {
-    QDir::setCurrent(QStringExt(argv[0]).beforeLast('\\'));
+    QApplication::setOrganizationName("winappmanager");
+    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::DataLocation);
+    QDir creator(".");
+    creator.mkdir(dataDir);
+    QDir::setCurrent(dataDir);
     QApplication a(argc, argv);
+    qDebug() << "ssl: " << QSslSocket::supportsSsl();
 
 
     QStringList cmdline_args = a.arguments();
@@ -61,7 +67,7 @@ int main(int argc, char *argv[])
     SettingsDialog::loadSettings();
 
     MainWindow w;
-    if(!(argc>0 && QString(argv[1])==QString("hidden")))
+    if(!(argc>1 && QString(argv[1])==QString("hidden")))
     {
         w.show();
     }

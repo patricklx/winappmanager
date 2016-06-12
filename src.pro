@@ -19,40 +19,38 @@ YAML = E:\programming\tools\yaml
 INCLUDEPATH += $$YAML/include
 INCLUDEPATH += E:\programming\tools\boost
 
-debug: DESTDIR = build/debug
-release: DESTDIR = build/release
 
-OPENSSL = E:\programming\tools\openssl\dist\lib
+release: DESTDIR = build/release
+debug: DESTDIR = build/debug
+
+
+
+
+CONFIG += static
+LIBS += -L$$[QT_INSTALL_PLUGINS]/imageformats -lqico
+LIBS += -L$$[QT_INSTALL_PLUGINS]/platforms -lqwindows
+
+QMAKE_LFLAGS += -static-libgcc -static-libstdc++ -static
+
+
 contains(CONFIG,release64){
     message (64 bit build)
     message ($$PWD/src)
-    OPENSSL = E:\programming\tools\openssl\dist64\lib
+    OPENSSL = E:/programming/tools/openssl/dist64/bin
+    LIBS += -L$$YAML/build/release64 -lyaml-cpp
+    DESTDIR = build/release64
+}else{
+    OPENSSL = E:/programming/tools/openssl/dist/bin
+    LIBS += -L$$YAML/build/release/ -lyaml-cpp
 }
 
+#LIBS += -L$$OPENSSL -llibeay32 -lssleay32
 LIBS += -lShlwapi
 
-QMAKE_CXXFLAGS+=-g -fexceptions
-QMAKE_STRIP=
-QMAKE_LFLAGS_RELEASE=
+#QMAKE_CXXFLAGS+=-g -fexceptions
+#QMAKE_STRIP=
+#QMAKE_LFLAGS_RELEASE=
 
-contains(CONFIG,release)   {
-    message (release build)
-   CONFIG += static
-   LIBS += -L$$[QT_INSTALL_PLUGINS]/imageformats -lqico
-   LIBS += -L$$[QT_INSTALL_PLUGINS]/accessible -lqtaccessiblewidgets
-   LIBS += -L$$[QT_INSTALL_PLUGINS]/platforms -lqwindows
-   LIBS += -L$$OPENSSL -lcrypto -lssl
-
-   QMAKE_LFLAGS += -static-libgcc -static-libstdc -static
-    contains(CONFIG,release64){
-        LIBS += -L$$YAML/build/release64 -lyaml-cpp
-        DESTDIR = build/release64
-    }else{
-        LIBS += -L$$YAML/build/release/ -lyaml-cpp
-    }
-}else{
-    LIBS += -L$$YAML/debug/ -lyaml-cpp
-}
 
 MOC_DIR = $${DESTDIR}/moc
 OBJECTS_DIR = $${DESTDIR}/obj
@@ -115,12 +113,21 @@ OTHER_FILES += \
     uml/Apps.qml \
     uml/Button.qml
 
-QMAKE_CXXFLAGS += -Wuninitialized -fdata-sections -ffunction-sections
-QMAKE_LFLAGS_RELEASE += -Wl,--gc-sections
+QMAKE_CXXFLAGS += -Wuninitialized
+
+contains(CONFIG, mydebug){
+    QMAKE_CXXFLAGS_RELEASE += -g
+    QMAKE_CFLAGS_RELEASE += -g
+    QMAKE_LFLAGS_RELEASE =
+}else{
+    QMAKE_LFLAGS_RELEASE += -Wl,--gc-sections
+}
 
 
 
 
 INCLUDEPATH += $$PWD/../yaml
 DEPENDPATH += $$PWD/../yaml
+
+DISTFILES +=
 

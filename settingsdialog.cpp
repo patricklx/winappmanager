@@ -261,7 +261,6 @@ void SettingsDialog::loadSettings()
 	SettingsDialog::defaults["UNINSTALL_MODE"] = SettingsDialog::Silent;
 	SettingsDialog::defaults["UPGRADE_MODE"] = SettingsDialog::Silent;
 	SettingsDialog::defaults["CLOSE_MODE"] = SettingsDialog::Ask;
-	SettingsDialog::defaults["CHECK_VERSIONS"] = true;
 	SettingsDialog::defaults["PROXY_ENABLED"] = false;
 	SettingsDialog::defaults["DOWNLOAD_COUNT"] = 3;
 	SettingsDialog::defaults["TASK_INSTALL_MODE"] = SettingsDialog::Silent;
